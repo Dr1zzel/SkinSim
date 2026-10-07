@@ -62,7 +62,8 @@ VENOUS_BLOOD = Tissue(
     t1_ms=Param(1550, 1900, 1600, M, "as arterial blood; deoxygenation shortens T1 slightly"),
     t2_ms=Param(40, 130, 80, L, "strongly oxygenation-dependent; superficial venous saturation "
                 "0.6-0.85 assumed; refocusing-interval-dependent"),
-    t2star_ms=Param(10, 50, 25, VL, "placeholder: intravascular T2* not reviewed"),
+    t2star_ms=Param(15, 32, 21, M, "Zhao et al., MRM 2007;58:592-597, Table 1: bovine blood "
+                    "in a shimmed phantom; in vivo likely lower"),
     pd_rel=Param(1.1, 1.4, 1.25, L, "estimate: as arterial blood"),
 )
 

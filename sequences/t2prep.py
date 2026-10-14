@@ -1,5 +1,12 @@
 """T2 preparation: non-selective 90 - n refocusing pulses - (-90), a spoiled readout train, recovery, repeat.
 
+COMPARISON CALCULATION, NOT AN ACQUISITION ARM. T2-prep is not reachable on
+the fl3d1r product sequence and will not be acquired for this abstract. It is
+kept to give a defensible number for what a flow-independent alternative would
+deliver at these tissue parameters and what it would cost in scan time
+(time_per_line_ms), for reviewers and for future directions. It is not scope
+creep and is deliberately absent from QUESTIONS.md.
+
 The prep stores Mz_in * exp(-prep_ms / T2) back along z; T1 recovery during the
 prep is neglected because the magnetisation is transverse throughout it.
 Blood T2 depends on the refocusing interval (Zhao et al., MRM 2007): the blood

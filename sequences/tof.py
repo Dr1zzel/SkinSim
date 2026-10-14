@@ -147,6 +147,7 @@ class TofSequence(Sequence):
         step = velocities[None] * self.timing.tr_ms / 1000.0
 
         def pulse_map(k: int) -> Affine:
+            """Return the per-TR map for the pulse k TRs before now, at each spin's position then."""
             z = self.blood_z(flow, np.maximum(positions[:, None, None] - k * step, 0.0))
             return compose(excitation_map(self.flip_at(z)), relax)
 

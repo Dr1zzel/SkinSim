@@ -102,6 +102,7 @@ class Protocol:
     timing: ReadoutTiming
     flip_deg: float
     tone_pct: float
+    tone_direction: int  # +1: TONE ramp rises towards the slab's +normal, the declared flow direction
     fat_sat: bool
     mtc: bool
     sat_band: SatBand | None
@@ -161,7 +162,8 @@ class Protocol:
         """Return the TOF signal model for this protocol; pass sampled band residuals, 0 being an ideal 90 deg pulse."""
         modules = [SaturationModule("fatsat_s", self.fat_sat_delay_ms)] if self.fat_sat else []
         modules += [SaturationModule("mtc_s", self.mtc_delay_ms)] if self.mtc else []
-        return TofSequence(timing=self.timing, flip_deg=self.flip_deg, modules=tuple(modules),
+        return TofSequence(timing=self.timing, flip_deg=self.flip_deg, tone_pct=self.tone_pct,
+                           tone_direction=self.tone_direction, modules=tuple(modules),
                            sat_band=self.sat_band, band_pulse_residual=band_pulse_residual)
 
 
@@ -176,6 +178,7 @@ MEASURED_TIMING = fl3d1r_timing(FINEST_INPLANE_MM, PARTITION_MM, BANDWIDTH_PER_P
 
 _OPERATING_POINT = Protocol(
     name="", acquired="2026-10-13", timing=MEASURED_TIMING, flip_deg=18.0, tone_pct=70.0,
+    tone_direction=+1,  # ASSUMED: declared flow direction not decoded; the band (side +1) then sits downstream
     fat_sat=True,
     mtc=False,  # ASSUMED: MTC is not listed in the decoded operating point; confirm from MrPhoenixProtocol
     sat_band=SatBand(thickness_mm=40.0, gap_mm=10.0, side=+1),

@@ -107,6 +107,6 @@ def test_static_signal_vectorises_over_a_sample_axis():
     seq = MEASURED["13oct_0.35mm"].sequence()
     fats = TissueSample("fat", t1_ms=np.array([360.0, 400.0]), t2_ms=70.0, t2star_ms=25.0, pd_rel=1.4,
                         fatsat_s=np.array([0.05, 0.5]))
-    out = seq.static_signal(fats)
+    out = seq.static_signal(fats, z_frac=0.5)
     assert out.shape == (2,)
-    assert out[0] == pytest.approx(seq.static_signal(TissueSample("fat", 360.0, 70.0, 25.0, 1.4, fatsat_s=0.05)))
+    assert out[0] == pytest.approx(seq.static_signal(TissueSample("fat", 360.0, 70.0, 25.0, 1.4, fatsat_s=0.05), 0.5))

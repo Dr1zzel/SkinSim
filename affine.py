@@ -12,6 +12,8 @@ Units: ms.
 """
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 import numpy as np
 from numpy.typing import ArrayLike
 
@@ -21,6 +23,11 @@ IDENTITY: Affine = (1.0, 0.0)
 
 def compose(*maps: Affine) -> Affine:
     """Return the single affine map that applies the given maps in order."""
+    return walk(maps)
+
+
+def walk(maps: Iterable[Affine]) -> Affine:
+    """Return the composition of a sequence of per-pulse maps, for trains whose TRs differ (power() needs them identical)."""
     a, b = IDENTITY
     for a_i, b_i in maps:
         a, b = a_i * a, a_i * b + b_i

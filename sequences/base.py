@@ -76,6 +76,7 @@ class FlowGeometry:
     mean_velocity_mm_s: float
     n_shells: int
     max_path_mm: float  # no justification; must be swept (see acquisition.path_length)
+    entry_z_frac: float | None = None  # through-slab position of a vessel parallel to the slab, needed under TONE
 
     def __post_init__(self) -> None:
         if self.mean_velocity_mm_s < 0:

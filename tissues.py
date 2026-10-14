@@ -194,7 +194,13 @@ HAEMODYNAMICS: dict[str, Param] = {
 
 # Uncertain quantities set by the hardware rather than the tissue, ranged and
 # sampled like everything else.
-ACQUISITION: dict[str, Param] = {}
+ACQUISITION: dict[str, Param] = {
+    "grappa_r2_g_factor": Param(
+        1.0, 1.5, 1.15, L, "GRAPPA R = 2 noise amplification for a 4-channel surface array: few "
+        "channels and little coil-sensitivity variation along the phase direction push g above 1, "
+        "and it varies with depth (Pruessmann et al., MRM 1999; Breuer et al., MRM 2009). Not "
+        "derivable without coil sensitivity maps; wide interval"),
+}
 
 
 def signal_weighting(tissue: TissueSample, te_ms: ArrayLike) -> ArrayLike:

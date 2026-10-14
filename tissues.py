@@ -1,14 +1,22 @@
-"""Tissue relaxation and proton-density parameters at 3 T, with no geometry.
+"""Tissue, haemodynamic and acquisition parameters at 3 T, and the sampler that propagates their uncertainty.
 
-Units: ms. Proton density is relative, dermis = 1 by definition.
+Units: ms for T1, T2, T2*; mm/s for velocities; mm for diameters. Proton
+density is relative, dermis = 1 by definition.
 Every parameter is an interval with a confidence rating and a source; the
-nominal value is a central point for sweeps, never the answer.
+nominal value is a central point for sanity checks, never the answer, and
+never a published figure: figures draw Latin-hypercube samples with a
+recorded seed (``sample``, ``sample_tissues``).
 Citations were entered from memory and must be checked against the papers.
+Nothing here is set from the 8 or 13 October 2026 measurements.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, fields
 from enum import Enum
+from typing import Literal
+
+import numpy as np
+from numpy.typing import ArrayLike
 
 
 class Confidence(Enum):
@@ -20,17 +28,20 @@ class Confidence(Enum):
 
 @dataclass(frozen=True)
 class Param:
-    """A tissue parameter as an interval with a nominal value, a confidence rating and a source."""
+    """A parameter as an interval with a nominal value, a confidence rating, a source and a sampling scale."""
 
     lo: float
     hi: float
     nominal: float
     confidence: Confidence
     source: str
+    log: bool = False  # sample log-uniformly, for quantities spanning decades
 
     def __post_init__(self) -> None:
         if not self.lo <= self.nominal <= self.hi:
             raise ValueError(f"need lo <= nominal <= hi, got {self.lo}, {self.nominal}, {self.hi}")
+        if self.log and self.lo <= 0:
+            raise ValueError("log sampling needs lo > 0")
 
 
 @dataclass(frozen=True)
@@ -40,8 +51,31 @@ class Tissue:
     name: str
     t1_ms: Param
     t2_ms: Param
-    t2star_ms: Param
+    t2star_ms: Param  # capped at the T2 lower bound so no draw has T2* > T2
     pd_rel: Param
+
+
+PARAM_FIELDS: tuple[str, ...] = tuple(f.name for f in fields(Tissue) if f.name != "name")
+
+
+@dataclass(frozen=True)
+class TissueSample:
+    """Values a simulation runs on: one point from a tissue's intervals, or arrays of draws along a sample axis."""
+
+    name: str
+    t1_ms: ArrayLike
+    t2_ms: ArrayLike
+    t2star_ms: ArrayLike
+    pd_rel: ArrayLike
+
+    @classmethod
+    def nominal(cls, tissue: Tissue) -> TissueSample:
+        """Return the tissue's nominal values, for sanity checks only."""
+        return cls(tissue.name, **{f: getattr(tissue, f).nominal for f in PARAM_FIELDS})
+
+    def at(self, i: int) -> TissueSample:
+        """Return draw i as a scalar sample, for code that caches on hashable samples."""
+        return TissueSample(self.name, **{f: float(np.asarray(getattr(self, f))[i]) for f in PARAM_FIELDS})
 
 
 H, M, L, VL = Confidence.HIGH, Confidence.MEDIUM, Confidence.LOW, Confidence.VERY_LOW
@@ -71,7 +105,8 @@ EPIDERMIS = Tissue(
     name="epidermis",
     t1_ms=Param(800, 1500, 1100, VL, "placeholder: no in vivo 3 T epidermis T1 reviewed"),
     t2_ms=Param(10, 40, 25, VL, "placeholder: no in vivo 3 T epidermis T2 reviewed"),
-    t2star_ms=Param(5, 30, 15, VL, "placeholder: no in vivo 3 T epidermis T2* reviewed"),
+    t2star_ms=Param(5, 10, 8, VL, "placeholder: no in vivo 3 T epidermis T2* reviewed; "
+                    "capped at the T2 lower bound"),
     pd_rel=Param(0.6, 1.2, 0.9, VL, "placeholder: viable epidermis assumed dermis-like; "
                  "stratum corneum is near-invisible"),
 )
@@ -82,8 +117,8 @@ DERMIS = Tissue(
                 "nominal is the earlier codebase's implied value"),
     t2_ms=Param(20, 60, 45, VL, "placeholder: nominal is the earlier codebase's implied value; "
                 "dermal T2 is multi-exponential (collagen-associated water)"),
-    t2star_ms=Param(5, 30, 15, VL, "placeholder: prior results name this the dominant "
-                    "uncertainty in the blood/dermis ratio"),
+    t2star_ms=Param(5, 20, 15, VL, "placeholder: prior results name this the dominant "
+                    "uncertainty in the blood/dermis ratio; capped at the T2 lower bound"),
     pd_rel=Param(1.0, 1.0, 1.0, H, "reference tissue: dermis = 1 by definition"),
 )
 
@@ -103,31 +138,129 @@ MUSCLE = Tissue(
     t1_ms=Param(1400, 1450, 1420, M, "Stanisz et al., MRM 2005 (~1410 ms); "
                 "Gold et al., AJR 2004 (~1420 ms)"),
     t2_ms=Param(30, 50, 40, M, "Gold et al., AJR 2004 (~32 ms); Stanisz et al., MRM 2005 (~50 ms)"),
-    t2star_ms=Param(20, 35, 28, L, "approximate 3 T skeletal muscle range; not reviewed"),
+    t2star_ms=Param(20, 30, 26, L, "approximate 3 T skeletal muscle range, not reviewed; "
+                    "capped at the T2 lower bound"),
     pd_rel=Param(1.0, 1.3, 1.15, L, "estimate: muscle water ~75 % vs dermis 60-70 %"),
 )
 
-ALL_TISSUES: tuple[Tissue, ...] = (
-    ARTERIAL_BLOOD, VENOUS_BLOOD, EPIDERMIS, DERMIS, HYPODERMIS, MUSCLE,
-)
+TISSUES: dict[str, Tissue] = {
+    "arterial_blood": ARTERIAL_BLOOD, "venous_blood": VENOUS_BLOOD, "epidermis": EPIDERMIS,
+    "dermis": DERMIS, "hypodermis": HYPODERMIS, "muscle": MUSCLE,
+}
+ALL_TISSUES: tuple[Tissue, ...] = tuple(TISSUES.values())
+
+# --- Haemodynamics -------------------------------------------------------------
+# Ported from SkinMRA (skinmra_sim/tissues.py). Direct human measurements exist
+# for capillaries; everything above them is inferred by scaling.
+
+CAPILLARY_VELOCITY = Param(
+    0.3, 1.0, 0.6, M, "nailfold capillaroscopy: arteriolar limb ~0.84 mm/s, venular limb "
+    "~0.47 mm/s; methods disagree ~10x. 10-15 um vessels: anchors the scaling only", log=True)
+
+ARTERIOLE_VELOCITY = Param(
+    1.0, 5.0, 2.5, L, "inferred; ascending arterioles and plexus, ~20-50 um", log=True)
+
+TARGET_VESSEL_VELOCITY = Param(
+    10.0, 150.0, 40.0, L,
+    "Mean velocity of 0.3-1 mm cutaneous arteries and veins. Revised 14 Oct 2026 upward from "
+    "SkinMRA's 5-50 mm/s, which was set for the 100-500 um plexus, on anatomical grounds and "
+    "NOT from the October images: vessels of this calibre are small named cutaneous arteries "
+    "and veins, an order of magnitude faster than the plexus. Microvascular mean velocity "
+    "rises roughly in proportion to diameter (Lipowsky, Microcirculation 2005; Zweifach & "
+    "Lipowsky, Circ Res 1977), extrapolating to tens of mm/s at 0.3 mm; Doppler ultrasound of "
+    "~1 mm peripheral arteries (e.g. digital arteries) reports mean velocities of several cm/s. "
+    "Veins sit at the low end. VERIFY all three; swept, never a fixed assumption", log=True)
+
+THERMOREGULATORY_FACTOR = Param(
+    0.3, 3.0, 1.0, M, "skin perfusion swings an order of magnitude with thermoregulation; "
+    "a cool scanner room and an immobilised leg sit at the low end. Multiplies velocity", log=True)
+
+TARGET_DIAMETER = Param(
+    0.1, 1.0, 0.3, H, "mm. Swept axis, not an uncertainty: spans the SKIN-COILS proposal's "
+    "100-500 um target and small cutaneous arteries and veins up to 1 mm", log=True)
+
+VESSEL_ANGLE_TO_SLAB_NORMAL = Param(
+    0.0, 90.0, 75.0, M, "deg. 0 = through-slab (brain-like), 90 = in the slab plane. The dermal "
+    "and subpapillary plexuses run near-parallel to the skin surface")
+
+HAEMODYNAMICS: dict[str, Param] = {
+    "capillary_velocity": CAPILLARY_VELOCITY,
+    "arteriole_velocity": ARTERIOLE_VELOCITY,
+    "target_vessel_velocity": TARGET_VESSEL_VELOCITY,
+    "thermoregulatory_factor": THERMOREGULATORY_FACTOR,
+    "target_diameter": TARGET_DIAMETER,
+    "vessel_angle_to_slab_normal": VESSEL_ANGLE_TO_SLAB_NORMAL,
+}
+
+# Uncertain quantities set by the hardware rather than the tissue, ranged and
+# sampled like everything else.
+ACQUISITION: dict[str, Param] = {}
+
+
+def signal_weighting(tissue: TissueSample, te_ms: ArrayLike) -> ArrayLike:
+    """Return the gradient-echo proton-density and T2* weighting pd * exp(-TE / T2*), exact for engines run with unit M0."""
+    te = np.asarray(te_ms, dtype=float)
+    return np.asarray(tissue.pd_rel, dtype=float) * np.exp(-te / np.asarray(tissue.t2star_ms, dtype=float))
+
+
+def collect_params(
+    tissue_keys: list[str], tissue_fields: tuple[str, ...] = PARAM_FIELDS,
+    haemodynamic_keys: tuple[str, ...] = (), acquisition_keys: tuple[str, ...] = (),
+) -> dict[str, Param]:
+    """Return selected parameters flattened into one ordered dict keyed '<tissue>.<field>' or by bare key."""
+    out = {f"{k}.{f}": getattr(TISSUES[k], f) for k in tissue_keys for f in tissue_fields}
+    out.update({k: HAEMODYNAMICS[k] for k in haemodynamic_keys})
+    out.update({k: ACQUISITION[k] for k in acquisition_keys})
+    return out
+
+
+def sample(params: dict[str, Param], n: int, seed: int,
+           method: Literal["lhs", "sobol", "nominal"] = "lhs") -> dict[str, np.ndarray]:
+    """Return n deterministic draws per parameter over its interval (Sobol rounds n up to a power of two)."""
+    from scipy.stats import qmc  # imported here: scipy.stats is slow to import and only sampling needs it
+
+    if method == "nominal":
+        return {k: np.array([p.nominal]) for k, p in params.items()}
+    if method == "lhs":
+        unit = qmc.LatinHypercube(d=len(params), seed=seed).random(n)
+    elif method == "sobol":
+        unit = qmc.Sobol(d=len(params), scramble=True, seed=seed).random_base2(int(np.ceil(np.log2(max(n, 2)))))
+    else:
+        raise ValueError(f"unknown method {method!r}")
+    return {k: _scale(p, unit[:, j]) for j, (k, p) in enumerate(params.items())}
+
+
+def _scale(p: Param, u: np.ndarray) -> np.ndarray:
+    if p.log:
+        return np.exp(np.log(p.lo) + u * (np.log(p.hi) - np.log(p.lo)))
+    return p.lo + u * (p.hi - p.lo)
+
+
+def sample_tissues(
+    tissue_keys: list[str], n: int, seed: int, method: Literal["lhs", "sobol", "nominal"] = "lhs",
+    haemodynamic_keys: tuple[str, ...] = (), acquisition_keys: tuple[str, ...] = (),
+) -> tuple[dict[str, TissueSample], dict[str, np.ndarray]]:
+    """Return one jointly drawn TissueSample per tissue key, with arrays along the sample axis, and the other draws."""
+    draws = sample(collect_params(tissue_keys, PARAM_FIELDS, haemodynamic_keys, acquisition_keys),
+                   n, seed, method)
+    tissues = {k: TissueSample(TISSUES[k].name, **{f: draws[f"{k}.{f}"] for f in PARAM_FIELDS})
+               for k in tissue_keys}
+    others = {k: v for k, v in draws.items() if "." not in k}
+    return tissues, others
 
 
 def low_confidence_entries() -> list[tuple[str, str, Param]]:
-    """Return (tissue name, parameter name, Param) for every LOW or VERY_LOW parameter."""
+    """Return (owner, parameter name, Param) for every LOW or VERY_LOW parameter, tissues first."""
     weak = (Confidence.LOW, Confidence.VERY_LOW)
-    return [
-        (tissue.name, field.name, getattr(tissue, field.name))
-        for tissue in ALL_TISSUES
-        for field in fields(tissue)
-        if isinstance(getattr(tissue, field.name), Param)
-        and getattr(tissue, field.name).confidence in weak
-    ]
+    entries = [(t.name, f, getattr(t, f)) for t in ALL_TISSUES for f in PARAM_FIELDS]
+    entries += [("haemodynamics", k, p) for k, p in HAEMODYNAMICS.items()]
+    entries += [("acquisition", k, p) for k, p in ACQUISITION.items()]
+    return [e for e in entries if e[2].confidence in weak]
 
 
 def low_confidence_report() -> str:
     """Return one line per LOW or VERY_LOW parameter giving its range, nominal value and source."""
     return "\n".join(
-        f"{tissue} {name}: {p.lo:g}-{p.hi:g} (nominal {p.nominal:g}) "
-        f"{p.confidence.name}: {p.source}"
-        for tissue, name, p in low_confidence_entries()
+        f"{owner} {name}: {p.lo:g}-{p.hi:g} (nominal {p.nominal:g}) {p.confidence.name}: {p.source}"
+        for owner, name, p in low_confidence_entries()
     )

@@ -73,6 +73,10 @@ These come from the earlier codebase (SkinMRA) and were computed with placeholde
 1. Inflow contrast fades along the vessel with visible length ≈ v·T_sat, with T_sat ≈ 0.81 s. (SkinSim's first TOF look, 7 October, found visible length ∝ v but with a T_sat that depends on threshold and background.)
 2. Tilting the slab away from the skin surface gains at most ~36 % and costs ~5× the number of slabs.
 
+## SkinMRA is archived
+
+The earlier codebase (`../SkinMRA`) is superseded and archived as of 14 October 2026. Ported from it: the Latin-hypercube/Sobol sampler (`tissues.collect_params`, `tissues.sample`, now returning `TissueSample` via `tissues.sample_tissues`); `signal_weighting` (PD · exp(−TE/T2*)); `cnr_efficiency` (`analysis.py`, against absolute CNR); the haemodynamic parameters, with the target-vessel velocity revised upward on anatomical grounds; and the literature validation of inflow enhancement (`tests/test_validation.py`). Deliberately not ported: the PyPulseq block-walking machinery.
+
 ## Superseded decisions
 
 Recorded so they are not re-litigated by accident. Everything removed is recoverable from the tag `pre-tof-refactor`.

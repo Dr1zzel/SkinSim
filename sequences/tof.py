@@ -5,7 +5,6 @@ ideal spoiling, so only Mz carries between pulses (the scalar path of bloch.py).
 """
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
 
 import numpy as np
@@ -18,8 +17,8 @@ def mz_before_pulse(
     n_pulses: np.ndarray, mz_initial: float, m0: float, flip_deg: float, tr_ms: float, t1_ms: float
 ) -> np.ndarray:
     """Return Mz just before the next pulse after n_pulses ideally spoiled pulses, n_pulses = inf giving the steady state."""
-    e1 = math.exp(-tr_ms / t1_ms)
-    q = e1 * math.cos(math.radians(flip_deg))
+    e1 = np.exp(-tr_ms / np.asarray(t1_ms, dtype=float))
+    q = e1 * np.cos(np.radians(flip_deg))
     mz_ss = m0 * (1 - e1) / (1 - q)
     return mz_ss + (mz_initial - mz_ss) * np.power(q, n_pulses)
 
@@ -41,9 +40,8 @@ class TofSequence(Sequence):
 
     def static_signal(self, tissue: TissueSample) -> float:
         """Return the echo signal of a static tissue at its spoiled steady state."""
-        mz = mz_before_pulse(np.inf, tissue.pd_rel, tissue.pd_rel, self.flip_deg,
-                             self.timing.tr_ms, tissue.t1_ms)
-        return float(mz) * math.sin(math.radians(self.flip_deg)) * self.readout_decay(tissue.t2star_ms)
+        mz = mz_before_pulse(np.inf, 1.0, 1.0, self.flip_deg, self.timing.tr_ms, tissue.t1_ms)
+        return self.echo(mz, self.flip_deg, tissue)
 
     def blood_signal(self, blood: TissueSample, flow: FlowGeometry, positions_mm: np.ndarray) -> np.ndarray:
         """Return the area-weighted laminar echo signal of blood at distances positions_mm from slab entry."""
@@ -52,7 +50,5 @@ class TofSequence(Sequence):
             raise ValueError(f"positions must lie within the slab path, 0 to {flow.path_mm():.3g} mm")
         velocities, weights = laminar_velocities(flow.mean_velocity_mm_s, flow.n_shells)
         n = pulses_received(positions[:, None], velocities[None, :], self.timing.tr_ms)
-        mz = mz_before_pulse(n, self.inflow_mz_fraction * blood.pd_rel, blood.pd_rel,
-                             self.flip_deg, self.timing.tr_ms, blood.t1_ms)
-        echo = math.sin(math.radians(self.flip_deg)) * self.readout_decay(blood.t2star_ms)
-        return (mz * echo) @ weights
+        mz = mz_before_pulse(n, self.inflow_mz_fraction, 1.0, self.flip_deg, self.timing.tr_ms, blood.t1_ms)
+        return self.echo(mz, self.flip_deg, blood) @ weights

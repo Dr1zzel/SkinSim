@@ -16,7 +16,7 @@ from acquisition import Slab, path_length
 from affine import Affine, IDENTITY, apply, compose, fixed_point, power, relax_map
 from bloch import spoiled_train
 from skin import Vessel, laminar_velocities
-from tissues import Tissue
+from tissues import TissueSample, signal_weighting  # TissueSample re-exported for callers
 
 
 @dataclass(frozen=True)
@@ -68,23 +68,6 @@ class Preparation:
 
 
 @dataclass(frozen=True)
-class TissueSample:
-    """One point drawn from a tissue's parameter intervals, the values a simulation runs on."""
-
-    name: str
-    t1_ms: float
-    t2_ms: float
-    t2star_ms: float
-    pd_rel: float
-
-    @classmethod
-    def nominal(cls, tissue: Tissue) -> TissueSample:
-        """Return the tissue's nominal values; sweeps construct samples directly."""
-        return cls(tissue.name, tissue.t1_ms.nominal, tissue.t2_ms.nominal,
-                   tissue.t2star_ms.nominal, tissue.pd_rel.nominal)
-
-
-@dataclass(frozen=True)
 class FlowGeometry:
     """Flow of one vessel through one slab, with laminar shells and the explicit path cap."""
 
@@ -131,9 +114,9 @@ class Sequence(ABC):
         prep = self.preparation
         return self.timing.tr_ms + (prep.duration_ms + prep.recovery_ms) / prep.lines_per_train
 
-    def readout_decay(self, t2star_ms: float) -> float:
-        """Return the T2* decay from the RF centre to the echo."""
-        return math.exp(-self.timing.te_ms / t2star_ms)
+    def echo(self, mz_over_m0: np.ndarray, flip_deg: float, tissue: TissueSample) -> np.ndarray:
+        """Return the echo signal from Mz / M0 just before a pulse of flip_deg, via signal_weighting."""
+        return mz_over_m0 * np.sin(np.radians(flip_deg)) * signal_weighting(tissue, self.timing.te_ms)
 
     @abstractmethod
     def static_signal(self, tissue: TissueSample) -> float:
@@ -242,8 +225,7 @@ class SegmentedSequence(Sequence):
 
     def train_signals(self, tissue: TissueSample) -> np.ndarray:
         """Return the echo signal magnitude of a static tissue at every line of the train."""
-        echo = math.sin(math.radians(self.flip_deg)) * self.readout_decay(tissue.t2star_ms)
-        return np.abs(self.train_mz(tissue)) * echo
+        return self.echo(np.abs(self.train_mz(tissue)) / tissue.pd_rel, self.flip_deg, tissue)
 
     def static_signal(self, tissue: TissueSample) -> float:
         """Return the echo signal of a static tissue at the k-space centre line."""
@@ -283,6 +265,5 @@ class SegmentedSequence(Sequence):
         if positions.min() < 0 or positions.max() > flow.path_mm():
             raise ValueError(f"positions must lie within the slab path, 0 to {flow.path_mm():.3g} mm")
         velocities, weights = laminar_velocities(flow.mean_velocity_mm_s, flow.n_shells)
-        echo = math.sin(math.radians(self.flip_deg)) * self.readout_decay(blood.t2star_ms)
         mz = np.array([[self.blood_mz(blood, time_in_slab_ms(s, v)) for v in velocities] for s in positions])
-        return (np.abs(mz) * echo) @ weights
+        return self.echo(np.abs(mz) / blood.pd_rel, self.flip_deg, blood) @ weights

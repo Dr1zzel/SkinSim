@@ -31,6 +31,27 @@ class Slab:
         return np.array([math.sin(tilt), 0.0, math.cos(tilt)])
 
 
+@dataclass(frozen=True)
+class SatBand:
+    """Travelling saturation band beside the slab, on side +1 or -1 along the slab normal, moving with it."""
+
+    thickness_mm: float
+    gap_mm: float
+    side: int  # +1: beyond the slab's +normal face; -1: beyond its -normal face
+
+    def __post_init__(self) -> None:
+        if self.side not in (1, -1):
+            raise ValueError("side must be +1 or -1")
+
+
+def entry_side(slab: Slab, vessel: Vessel) -> int:
+    """Return the side (+1 or -1 along the normal) through which blood flowing along the vessel enters, 0 if parallel to the slab."""
+    along = float(np.dot(vessel.direction(), slab.normal()))
+    if abs(along) < 1e-12:
+        return 0
+    return -1 if along > 0 else 1
+
+
 def path_length(slab: Slab, vessel: Vessel, max_path_mm: float) -> float:
     """Return the vessel's path through the slab, thickness / |direction . normal|, capped at max_path_mm, a bound with no justification (slab lateral extent or straight-segment length) that must be swept."""
     if max_path_mm <= 0:

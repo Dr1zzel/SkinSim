@@ -23,8 +23,12 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, replace
 
-from acquisition import Slab
+from acquisition import SatBand, Slab
+from numpy.typing import ArrayLike
+
 from sequences.base import ReadoutTiming
+from sequences.prep import SaturationModule
+from sequences.tof import TofSequence
 
 GAMMA_HZ_PER_MT = 42577.48  # 1H gyromagnetic ratio / 2 pi
 
@@ -90,19 +94,6 @@ def fl3d1r_timing(inplane_mm: float, partition_mm: float, bandwidth_per_px_hz: f
 
 
 @dataclass(frozen=True)
-class SatBand:
-    """Travelling saturation band beside the slab, on side +1 or -1 along the slab normal."""
-
-    thickness_mm: float
-    gap_mm: float
-    side: int  # +1: beyond the slab's +normal face; -1: beyond its -normal face
-
-    def __post_init__(self) -> None:
-        if self.side not in (1, -1):
-            raise ValueError("side must be +1 or -1")
-
-
-@dataclass(frozen=True)
 class Protocol:
     """One fl3d1r acquisition: settings as decoded, plus derived voxel, line counts and scan time."""
 
@@ -165,6 +156,13 @@ class Protocol:
     def slab(self) -> Slab:
         """Return the excitation slab."""
         return Slab(thickness_mm=self.slab_thickness_mm, orientation_deg=self.slab_orientation_deg)
+
+    def sequence(self, band_pulse_residual: ArrayLike = 0.0) -> TofSequence:
+        """Return the TOF signal model for this protocol; pass sampled band residuals, 0 being an ideal 90 deg pulse."""
+        modules = [SaturationModule("fatsat_s", self.fat_sat_delay_ms)] if self.fat_sat else []
+        modules += [SaturationModule("mtc_s", self.mtc_delay_ms)] if self.mtc else []
+        return TofSequence(timing=self.timing, flip_deg=self.flip_deg, modules=tuple(modules),
+                           sat_band=self.sat_band, band_pulse_residual=band_pulse_residual)
 
 
 # --- 13 October 2026: five series sharing one operating point --------------------

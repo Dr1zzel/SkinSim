@@ -53,6 +53,8 @@ class Tissue:
     t2_ms: Param
     t2star_ms: Param  # capped at the T2 lower bound so no draw has T2* > T2
     pd_rel: Param
+    fatsat_s: Param  # fraction of Mz one fat-saturation pulse leaves (sequences/prep.py)
+    mtc_s: Param  # fraction of Mz one MTC pulse leaves: an effective, crude MT factor
 
 
 PARAM_FIELDS: tuple[str, ...] = tuple(f.name for f in fields(Tissue) if f.name != "name")
@@ -67,6 +69,8 @@ class TissueSample:
     t2_ms: ArrayLike
     t2star_ms: ArrayLike
     pd_rel: ArrayLike
+    fatsat_s: ArrayLike = 1.0  # 1 = untouched; nominal() and the sampler always fill these from Tissue
+    mtc_s: ArrayLike = 1.0
 
     @classmethod
     def nominal(cls, tissue: Tissue) -> TissueSample:
@@ -89,6 +93,10 @@ ARTERIAL_BLOOD = Tissue(
     t2star_ms=Param(45, 75, 65, M, "Zhao et al., MRM 2007;58:592-597, Table 1: bovine blood "
                     "in a shimmed phantom; in vivo likely lower"),
     pd_rel=Param(1.1, 1.4, 1.25, L, "estimate: blood water ~0.8 g/mL vs dermis 0.6-0.7"),
+    fatsat_s=Param(1.0, 1.0, 1.0, H, "on-resonance water: a fat-selective pulse leaves blood "
+                   "untouched, and blood's bound pool is negligible"),
+    mtc_s=Param(0.95, 1.0, 0.98, M, "blood bound-pool fraction < 1 %, so an off-resonance MT pulse "
+                "barely saturates it (SkinMRA; Stanisz et al., MRM 2005, for MT-inactive fluids)"),
 )
 
 VENOUS_BLOOD = Tissue(
@@ -99,6 +107,10 @@ VENOUS_BLOOD = Tissue(
     t2star_ms=Param(15, 32, 21, M, "Zhao et al., MRM 2007;58:592-597, Table 1: bovine blood "
                     "in a shimmed phantom; in vivo likely lower"),
     pd_rel=Param(1.1, 1.4, 1.25, L, "estimate: as arterial blood"),
+    fatsat_s=Param(1.0, 1.0, 1.0, H, "on-resonance water: a fat-selective pulse leaves blood "
+                   "untouched, and blood's bound pool is negligible"),
+    mtc_s=Param(0.95, 1.0, 0.98, M, "blood bound-pool fraction < 1 %, so an off-resonance MT pulse "
+                "barely saturates it (SkinMRA; Stanisz et al., MRM 2005, for MT-inactive fluids)"),
 )
 
 EPIDERMIS = Tissue(
@@ -109,6 +121,13 @@ EPIDERMIS = Tissue(
                     "capped at the T2 lower bound"),
     pd_rel=Param(0.6, 1.2, 0.9, VL, "placeholder: viable epidermis assumed dermis-like; "
                  "stratum corneum is near-invisible"),
+    fatsat_s=Param(0.7, 1.0, 0.9, VL, "MT PROXY, NOT SPECTRAL SUPPRESSION: the off-resonance fat "
+                   "pulse partially saturates collagen-bound protons, which exchange with free water, so "
+                   "epidermis sits below 1 by an unknown amount. One of the quantities the measurements will "
+                   "constrain, not one they have constrained"),
+    mtc_s=Param(0.5, 0.95, 0.75, VL, "effective per-pulse residual under the MTC pulse; skin is "
+                "strongly MT-active (Mirrashed & Sharp, Skin Res Technol 2004, qualitative only); no "
+                "quantitative 3 T value for this pulse located"),
 )
 
 DERMIS = Tissue(
@@ -120,6 +139,13 @@ DERMIS = Tissue(
     t2star_ms=Param(5, 20, 15, VL, "placeholder: prior results name this the dominant "
                     "uncertainty in the blood/dermis ratio; capped at the T2 lower bound"),
     pd_rel=Param(1.0, 1.0, 1.0, H, "reference tissue: dermis = 1 by definition"),
+    fatsat_s=Param(0.7, 1.0, 0.9, VL, "MT PROXY, NOT SPECTRAL SUPPRESSION: the off-resonance fat "
+                   "pulse partially saturates collagen-bound protons, which exchange with free water, so "
+                   "dermis sits below 1 by an unknown amount. One of the quantities the measurements will "
+                   "constrain, not one they have constrained"),
+    mtc_s=Param(0.5, 0.95, 0.75, VL, "effective per-pulse residual under the MTC pulse; skin is "
+                "strongly MT-active (Mirrashed & Sharp, Skin Res Technol 2004, qualitative only); no "
+                "quantitative 3 T value for this pulse located"),
 )
 
 HYPODERMIS = Tissue(
@@ -131,6 +157,13 @@ HYPODERMIS = Tissue(
                     "multi-peak fat at 3 T"),
     pd_rel=Param(1.1, 1.6, 1.4, L, "estimate: lipid ~100 mol 1H/L vs dermal water fraction "
                  "0.6-0.7 of 111 mol 1H/L; MR-visible dermal fraction unknown"),
+    fatsat_s=Param(0.05, 0.5, 0.15, L, "achievable CHESS suppression: the olefinic (5.3 ppm) and "
+                   "glycerol (~4.2 ppm) peaks, together ~8-10 % of fat protons, lie close to water and "
+                   "escape a fat-selective pulse (Ren et al., J Lipid Res 2008; Hamilton et al., NMR "
+                   "Biomed 2011), which sets the floor; B0 inhomogeneity over a limb shifts the main "
+                   "methylene peak partly out of the pulse band (Bley et al., JMRI 2010), which widens "
+                   "the upper bound. Set from physics, not from the images"),
+    mtc_s=Param(0.9, 1.0, 0.97, L, "fat has a small bound pool, so little MT saturation"),
 )
 
 MUSCLE = Tissue(
@@ -141,6 +174,10 @@ MUSCLE = Tissue(
     t2star_ms=Param(20, 30, 26, L, "approximate 3 T skeletal muscle range, not reviewed; "
                     "capped at the T2 lower bound"),
     pd_rel=Param(1.0, 1.3, 1.15, L, "estimate: muscle water ~75 % vs dermis 60-70 %"),
+    fatsat_s=Param(1.0, 1.0, 1.0, H, "on-resonance water, as specified. By the dermis MT argument "
+                   "muscle, also MT-active, may sit slightly below 1"),
+    mtc_s=Param(0.6, 0.95, 0.8, L, "muscle MTR under typical off-resonance MT pulses is ~20-40 % at "
+                "steady state; the per-pulse effective residual is inferred from that, crudely"),
 )
 
 TISSUES: dict[str, Tissue] = {
@@ -195,6 +232,10 @@ HAEMODYNAMICS: dict[str, Param] = {
 # Uncertain quantities set by the hardware rather than the tissue, ranged and
 # sampled like everything else.
 ACQUISITION: dict[str, Param] = {
+    "sat_band_pulse_residual": Param(
+        -0.31, 0.31, 0.0, L, "fraction of Mz one travelling-saturation-band pulse leaves, cos(90 deg x b) "
+        "for a B1 scale b of 0.8-1.2 under body transmit at the leg; negative = over-tipped. Assumes the "
+        "band is played every TR, which is not verified from the protocol"),
     "grappa_r2_g_factor": Param(
         1.0, 1.5, 1.15, L, "GRAPPA R = 2 noise amplification for a 4-channel surface array: few "
         "channels and little coil-sensitivity variation along the phase direction push g above 1, "

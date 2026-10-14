@@ -14,7 +14,8 @@ the pulse index and vectorised over positions, shells and samples.
 Assumes an ideal rectangular slab profile and ideal spoiling.
 
 Shapes: positions (P,), laminar shells (S,), and a sample axis (N,) when the
-TissueSample fields are arrays; blood_signal returns (P,) or (P, N).
+TissueSample fields or the flow's mean velocity are arrays; shell velocities
+are (S, N) and blood_signal returns (P,) or (P, N).
 """
 from __future__ import annotations
 
@@ -119,14 +120,14 @@ class TofSequence(Sequence):
         return z if side < 0 else 1 - z
 
     def inflow_mz(self, blood: TissueSample, flow: FlowGeometry, velocities: np.ndarray) -> np.ndarray:
-        """Return Mz / M0 of blood reaching the slab face per laminar shell (rows), band-saturated if on the entry side."""
+        """Return Mz / M0 of blood reaching the slab face for shell velocities (S, N), band-saturated if on the entry side."""
         upstream = fixed_point(between_excitations(self.pulses(blood), blood, self.timing.tr_ms))
-        shells = np.ones((len(velocities), 1)) * upstream
+        shells = np.zeros_like(velocities) + upstream
         side = entry_side(flow.slab, flow.vessel)
         if self.sat_band is None or side == 0 or self.sat_band.side != side:
             return shells
         along = abs(float(np.dot(flow.vessel.direction(), flow.slab.normal())))
-        v = velocities[:, None] * along  # speed along the slab normal
+        v = velocities * along  # speed along the slab normal
         n_band = np.floor(transit_ms(self.sat_band.thickness_mm, v) / self.timing.tr_ms)
         exit_mz = band_exit_mz(shells, n_band, self.band_pulse_residual, blood, self.timing.tr_ms)
         return apply(relax_map(transit_ms(self.sat_band.gap_mm, v), blood.t1_ms), exit_mz)
@@ -143,15 +144,15 @@ class TofSequence(Sequence):
         relax = between_excitations(self.pulses(blood), blood, self.timing.tr_ms)
         finite = n[np.isfinite(n)]
         k_top = int(min(self.memory_pulses(relax[0]), finite.max() if finite.size else 0))
-        step = velocities[None, :] * self.timing.tr_ms / 1000.0
+        step = velocities[None] * self.timing.tr_ms / 1000.0
 
         def pulse_map(k: int) -> Affine:
-            z = self.blood_z(flow, np.maximum(positions[:, None] - k * step, 0.0))
-            return compose(excitation_map(self.flip_at(z)[..., None]), relax)
+            z = self.blood_z(flow, np.maximum(positions[:, None, None] - k * step, 0.0))
+            return compose(excitation_map(self.flip_at(z)), relax)
 
-        mz = np.where(n[..., None] > k_top, fixed_point(pulse_map(k_top)), inflow[None])  # older history < 1e-12
+        mz = np.where(n > k_top, fixed_point(pulse_map(k_top)), inflow[None])  # older history < 1e-12
         for k in range(k_top, 0, -1):
-            mz = np.where(n[..., None] >= k, apply(pulse_map(k), mz), mz)
+            mz = np.where(n >= k, apply(pulse_map(k), mz), mz)
         return mz
 
     def blood_signal(self, blood: TissueSample, flow: FlowGeometry, positions_mm: np.ndarray) -> np.ndarray:
@@ -159,12 +160,14 @@ class TofSequence(Sequence):
         positions = np.atleast_1d(np.asarray(positions_mm, dtype=float))
         if positions.min() < 0 or positions.max() > flow.path_mm():
             raise ValueError(f"positions must lie within the slab path, 0 to {flow.path_mm():.3g} mm")
-        scalar, blood = np.ndim(blood.t1_ms) == 0, as_sample_axis(blood)
-        velocities, weights = laminar_velocities(flow.mean_velocity_mm_s, flow.n_shells)
-        n = pulses_received(positions[:, None], velocities[None, :], self.timing.tr_ms)
+        scalar = np.ndim(blood.t1_ms) == 0 and np.ndim(flow.mean_velocity_mm_s) == 0
+        blood = as_sample_axis(blood)
+        shell_factors, weights = laminar_velocities(1.0, flow.n_shells)  # shell velocities are linear in the mean
+        velocities = shell_factors[:, None] * np.atleast_1d(np.asarray(flow.mean_velocity_mm_s, dtype=float))
+        n = pulses_received(positions[:, None, None], velocities[None], self.timing.tr_ms)
         inflow = self.inflow_mz(blood, flow, velocities)
         if self.tone_pct == 0:
-            mz, flip = apply(power(self.tr_map(blood), n[..., None]), inflow[None]), self.flip_deg
+            mz, flip = apply(power(self.tr_map(blood), n), inflow[None]), self.flip_deg
         else:
             mz = self.walked_mz(blood, flow, positions, velocities, inflow, n)
             flip = self.flip_at(self.blood_z(flow, positions))[:, None, None]

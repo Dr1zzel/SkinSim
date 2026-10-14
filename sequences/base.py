@@ -73,13 +73,13 @@ class FlowGeometry:
 
     vessel: Vessel
     slab: Slab
-    mean_velocity_mm_s: float
+    mean_velocity_mm_s: float | np.ndarray  # an array runs along the sample axis (TOF only)
     n_shells: int
     max_path_mm: float  # no justification; must be swept (see acquisition.path_length)
     entry_z_frac: float | None = None  # through-slab position of a vessel parallel to the slab, needed under TONE
 
     def __post_init__(self) -> None:
-        if self.mean_velocity_mm_s < 0:
+        if np.any(np.asarray(self.mean_velocity_mm_s) < 0):
             raise ValueError("mean velocity must be non-negative; direction is set by the vessel")
 
     def path_mm(self) -> float:

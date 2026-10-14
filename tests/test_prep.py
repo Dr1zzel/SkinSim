@@ -92,7 +92,7 @@ def test_ideal_band_exit_then_gap_recovery_matches_hand_calculation():
     a_mean, b_mean = mean_recovery_map(TR_MS, BLOOD.t1_ms)
     exit_mz = b_mean  # an ideal pulse zeroes Mz, then a random fraction of TR recovers
     expected = 1 - (1 - exit_mz) * math.exp(-1000 * 10.0 / v / BLOOD.t1_ms)
-    assert seq.inflow_mz(BLOOD, flow(90.0, 0.0, v), np.array([v]))[0, 0] == pytest.approx(expected, rel=1e-9)
+    assert seq.inflow_mz(BLOOD, flow(90.0, 0.0, v), np.array([[v]]))[0, 0] == pytest.approx(expected, rel=1e-9)
     assert band_exit_mz(1.0, 0, 0.0, BLOOD, TR_MS) == 1.0  # no band pulse, no change
 
 

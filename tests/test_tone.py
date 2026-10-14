@@ -56,7 +56,8 @@ def test_walked_path_with_a_flat_ramp_equals_the_closed_form():
     positions = np.linspace(0.0, flow.path_mm(), 25)
     closed = seq.blood_signal(BLOOD, flow, positions)
     velocities, weights = laminar_velocities(flow.mean_velocity_mm_s, flow.n_shells)
-    n = pulses_received(positions[:, None], velocities[None, :], seq.timing.tr_ms)
+    velocities = velocities[:, None]  # (S, N) with one sample
+    n = pulses_received(positions[:, None, None], velocities[None], seq.timing.tr_ms)
     blood = as_sample_axis(BLOOD)
     walked = seq.walked_mz(blood, flow, positions, velocities, seq.inflow_mz(blood, flow, velocities), n)
     walked_signal = np.einsum("psn,s->pn", seq.echo(walked, seq.flip_deg, blood), weights)[:, 0]
@@ -102,3 +103,14 @@ def test_vessel_parallel_to_slab_needs_its_through_slab_position_under_tone():
         MEASURED_SEQ.blood_signal(BLOOD, flow, [1.0])
     flow = replace(flow, entry_z_frac=0.25)
     assert np.isfinite(MEASURED_SEQ.blood_signal(BLOOD, flow, [1.0, 10.0])).all()
+
+
+@pytest.mark.parametrize("tone_pct", [0.0, 70.0])
+def test_mean_velocity_along_the_sample_axis_matches_separate_calls(tone_pct):
+    seq = replace(MEASURED["13oct_0.35mm"].sequence(band_pulse_residual=0.1), tone_pct=tone_pct)
+    velocities = np.array([3.0, 25.0, 140.0])
+    positions = np.linspace(0.0, 11.04, 12)
+    together = seq.blood_signal(BLOOD, replace(through_slab(1.0, azimuth_deg=0.0), mean_velocity_mm_s=velocities),
+                                positions)
+    apart = np.stack([seq.blood_signal(BLOOD, through_slab(v, azimuth_deg=0.0), positions) for v in velocities], axis=1)
+    np.testing.assert_allclose(together, apart, rtol=1e-12)

@@ -13,6 +13,7 @@ from functools import cache
 import numpy as np
 
 from acquisition import Slab, path_length
+from affine import Affine, IDENTITY, apply, compose, fixed_point, power, relax_map
 from bloch import spoiled_train
 from skin import Vessel, laminar_velocities
 from tissues import Tissue
@@ -153,43 +154,13 @@ class Sequence(ABC):
 
 
 # --- Segmented sequences: preparation -> spoiled readout train -> recovery -> repeat ---
-# With ideal spoiling every segment is an affine map on Mz, Mz_out = A * Mz_in + B,
-# so a whole cycle is one affine map and its periodic steady state is B / (1 - A).
-
-Affine = tuple[float, float]
-IDENTITY: Affine = (1.0, 0.0)
+# Every segment is an affine map on Mz (affine.py); a whole cycle is one map and
+# its periodic steady state is that map's fixed point.
 
 
-def compose(*maps: Affine) -> Affine:
-    """Return the single affine map that applies the given maps in order."""
-    a, b = IDENTITY
-    for a_i, b_i in maps:
-        a, b = a_i * a, a_i * b + b_i
-    return a, b
-
-
-def apply(m: Affine, mz: float) -> float:
-    """Return Mz after the affine map."""
-    return m[0] * mz + m[1]
-
-
-def power(m: Affine, n: float) -> Affine:
-    """Return the affine map applied n times; n = inf gives the constant map to its fixed point."""
-    if n == 0:
-        return IDENTITY
-    a_n = m[0] ** n
-    return a_n, m[1] * (1 - a_n) / (1 - m[0])
-
-
-def fixed_point(m: Affine) -> float:
-    """Return the Mz the affine map leaves unchanged, B / (1 - A)."""
-    return m[1] / (1 - m[0])
-
-
-def relax_map(duration_ms: float, tissue: TissueSample) -> Affine:
+def tissue_relax(duration_ms: float, tissue: TissueSample) -> Affine:
     """Return T1 recovery towards the tissue's proton density over duration_ms."""
-    e1 = math.exp(-duration_ms / tissue.t1_ms)
-    return e1, tissue.pd_rel * (1 - e1)
+    return relax_map(duration_ms, tissue.t1_ms, tissue.pd_rel)
 
 
 def train_map(n_pulses: int, flip_deg: float, tr_ms: float, tissue: TissueSample) -> Affine:
@@ -250,16 +221,16 @@ class SegmentedSequence(Sequence):
         last = n_lines if stop_ms >= n_lines * tr else math.ceil(stop_ms / tr - 1e-9)
         n = max(0, last - first)
         if n == 0:
-            return relax_map(stop_ms - start_ms, tissue)
+            return tissue_relax(stop_ms - start_ms, tissue)
         tail_ms = max(0.0, stop_ms - (first + n) * tr)
-        return compose(relax_map(first * tr - start_ms, tissue),
-                       train_map(n, self.flip_deg, tr, tissue), relax_map(tail_ms, tissue))
+        return compose(tissue_relax(first * tr - start_ms, tissue),
+                       train_map(n, self.flip_deg, tr, tissue), tissue_relax(tail_ms, tissue))
 
     @cache
     def train_start_mz(self, tissue: TissueSample, inside: bool) -> float:
         """Return the periodic steady-state Mz at the first readout pulse, inside or outside the slab."""
         rest = self.train_and_recovery_ms
-        after = self.in_slab_map(tissue, 0.0, rest) if inside else relax_map(rest, tissue)
+        after = self.in_slab_map(tissue, 0.0, rest) if inside else tissue_relax(rest, tissue)
         return fixed_point(compose(after, self.prep_map(tissue)))
 
     def train_mz(self, tissue: TissueSample) -> np.ndarray:
@@ -283,7 +254,7 @@ class SegmentedSequence(Sequence):
         now = self.center_line * self.timing.tr_ms
         entry = now - tau_ms
         if entry >= 0:  # entered during the current train, prepared but unsaturated until then
-            mz = apply(relax_map(entry, blood), self.train_start_mz(blood, inside=False))
+            mz = apply(tissue_relax(entry, blood), self.train_start_mz(blood, inside=False))
             return apply(self.in_slab_map(blood, entry, now), mz)
         mz, full_cycles = self.mz_at_next_train_start(blood, entry)
         cycle = compose(self.in_slab_map(blood, 0.0, self.train_and_recovery_ms), self.prep_map(blood))
@@ -302,7 +273,7 @@ class SegmentedSequence(Sequence):
         phase = entry_ms + cycles_back * period  # time after that cycle's first readout pulse
         if phase >= rest:  # entered during the non-selective preparation, so in = out
             return outside, cycles_back - 1
-        mz = apply(relax_map(phase, blood), outside)
+        mz = apply(tissue_relax(phase, blood), outside)
         mz = apply(compose(self.in_slab_map(blood, phase, rest), self.prep_map(blood)), mz)
         return mz, cycles_back - 1
 

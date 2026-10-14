@@ -18,7 +18,8 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from sequences.base import Affine, SegmentedSequence, TissueSample, compose, relax_map
+from affine import Affine, compose
+from sequences.base import SegmentedSequence, TissueSample, tissue_relax
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -46,4 +47,4 @@ class T2PrepSequence(SegmentedSequence):
 
     def prep_map(self, tissue: TissueSample) -> Affine:
         """Return T2 decay over the prep, with no T1 recovery while transverse, then T1 recovery over the crusher."""
-        return compose((math.exp(-self.prep_ms / tissue.t2_ms), 0.0), relax_map(self.crusher_ms, tissue))
+        return compose((math.exp(-self.prep_ms / tissue.t2_ms), 0.0), tissue_relax(self.crusher_ms, tissue))

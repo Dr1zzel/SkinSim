@@ -135,6 +135,7 @@ def main() -> None:
     fig.subplots_adjust(left=0.10, right=0.775, top=0.835, bottom=0.145)
     ax.axvspan(v_lo, v_hi, color=INK, alpha=0.06, lw=0, zorder=0)
 
+    stat_b = hline(ax, flat(plain, samples, "arterial_blood"), BLOOD_C, (0, (1, 1.6)), alpha=0.0)
     fat_u = hline(ax, flat(plain, samples, "hypodermis"), FAT_C, "-")
     fat_s = hline(ax, flat(fatsat, samples, "hypodermis"), FAT_C, "--")
     derm = hline(ax, flat(plain, samples, "dermis"), INK_2, ":", alpha=0.0)
@@ -160,6 +161,15 @@ def main() -> None:
     ax.annotate(f"vessel darker\nthan the fat\n{frac:.0%} of draws",
                 (VELOCITIES[0] * 1.9, fat_u * 0.80), ha="center", va="center",
                 fontsize=8.5, color=BLOOD_C, weight="bold", zorder=8)
+    i_lo = int(np.argmin(np.abs(VELOCITIES - v_lo)))
+    i_hi = int(np.argmin(np.abs(VELOCITIES - v_hi)))
+    ax.annotate("", (v_hi, stat_b), xytext=(v_hi, mid[i_hi]),
+                arrowprops=dict(arrowstyle="<->", color=INK, lw=1.3, shrinkA=0, shrinkB=0))
+    ax.annotate(f"inflow adds\n{mid[i_lo] / stat_b:.1f}x to {mid[i_hi] / stat_b:.1f}x",
+                (v_hi, np.sqrt(stat_b * mid[i_hi])), xytext=(9, 0), textcoords="offset points",
+                ha="left", va="center", fontsize=8.5, color=INK, zorder=9,
+                bbox=dict(fc="white", ec="none", alpha=0.9, pad=1.6))
+
     ax.annotate(f"every draw inverts,\nbetween {x5:.0f} and {x95:.0f} mm/s",
                 (x95, fat_u), xytext=(10, 26), textcoords="offset points",
                 ha="left", va="bottom", fontsize=8.5, color=INK, zorder=8,
@@ -176,6 +186,7 @@ def main() -> None:
                 arrowprops=dict(arrowstyle="-|>", color=INK_2, lw=2.0, alpha=0.55))
 
     for y, text, colour, weight in ((mid[-1], "blood, inflowing", BLOOD_C, "bold"),
+                                    (stat_b, "blood, no flow", BLOOD_C, "normal"),
                                     (fat_u, "subcutaneous fat", FAT_C, "normal"),
                                     (derm, "dermis", INK_2, "normal"),
                                     (fat_s, "fat, suppressed", FAT_C, "normal")):
@@ -201,6 +212,10 @@ def main() -> None:
     for side in ("top", "right"):
         ax.spines[side].set_visible(False)
 
+    print(f"Blood with NO flow (spoiled-GRE fixed point): {stat_b:.3f} = "
+          f"{stat_b / derm:.2f}x dermis, {stat_b / fat_s:.1f}x suppressed fat, {stat_b / fat_u:.2f}x fat")
+    print(f"Inflow enhancement over that floor: {mid[i_lo] / stat_b:.2f}x at {v_lo:.0f} mm/s, "
+          f"{mid[i_hi] / stat_b:.2f}x at {v_hi:.0f} mm/s")
     print(f"Backgrounds (median, dermis M0): fat {fat_u:.3f}, fat suppressed {fat_s:.3f}, dermis {derm:.3f}")
     print(f"Target cutaneous velocity 5-95 % of draws: {v_lo:.0f}-{v_hi:.0f} mm/s")
     print(f"Inversion against unsuppressed fat: {len(xs)}/{N_DRAWS} draws invert; "

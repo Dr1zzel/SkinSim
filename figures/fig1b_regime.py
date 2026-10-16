@@ -99,7 +99,7 @@ def crossing_velocities(seq: TofSequence, samples: list[dict[str, TissueSample]]
     return np.array(out)
 
 
-def reference(ax, values, colour: str, style, label: str, band: bool = False) -> float:
+def reference(ax, values, colour: str, style, label: str, band: bool = True) -> float:
     """Draw a velocity-independent level as a line, label it in the right margin, return its median."""
     lo, mid, hi = np.percentile(np.asarray(values, dtype=float), [5, 50, 95])
     if band:
@@ -139,9 +139,10 @@ def main() -> None:
                       "subcutaneous fat", band=True)
     fat_s = reference(ax, [fatsat.static_signal(s["hypodermis"]) for s in samples], FAT_C, "--",
                       "fat, suppressed", band=True)
-    derm = reference(ax, [plain.static_signal(s["dermis"]) for s in samples], INK_2, DOTTED, "dermis")
-    stat = reference(ax, [plain.static_signal(s["arterial_blood"]) for s in samples], BLOOD_C, DOTTED,
-                     "blood, stagnant")
+    derm_v = np.array([float(plain.static_signal(s["dermis"])) for s in samples])
+    stat_v = np.array([float(plain.static_signal(s["arterial_blood"])) for s in samples])
+    derm = reference(ax, derm_v, INK_2, DOTTED, "dermis")
+    stat = reference(ax, stat_v, BLOOD_C, DOTTED, "blood, stagnant")
 
     # The inversion as an area, not a crossing the reader has to decode.
     ax.fill_between(VELOCITIES, mid, fat_u, where=mid < fat_u, color=BLOOD_C, alpha=0.26,
@@ -165,7 +166,7 @@ def main() -> None:
     ax.xaxis.set_minor_locator(plt.NullLocator())
     ax.set_xlabel("mean blood velocity (mm/s)", color=INK_2, labelpad=40)
     ax.set_ylabel("simulated signal\n(1 = full dermis magnetisation)", color=INK_2)
-    ax.set_title("Inflow is not what makes a cutaneous vessel visible — the background is",
+    ax.set_title("Fat suppression, not inflow, is what makes a cutaneous vessel visible",
                  fontsize=10.5, color=INK, loc="left", pad=16)
     ax.text(0, 1.015, f"spoiled-GRE TOF, TR {TR_MS:g} ms, {FLIP_DEG:g}°, {SLAB_MM:g} mm slab; "
                       f"gap to the stagnant line = the inflow gain",
@@ -186,6 +187,11 @@ def main() -> None:
     print(f"Inversion vs unsuppressed fat: {len(xs)}/{N_DRAWS} draws invert, at {x50:.0f} mm/s "
           f"[{x5:.0f}-{x95:.0f}] (transit {SLAB_MM / x50:.2f} s); {frac:.0%} of joint draws sit below it")
     print(f"Against suppressed fat the median never inverts: minimum {np.min(mid) / fat_s:.1f}x")
+    for name, level in (("dermis", derm_v), ("suppressed fat",
+                        np.array([float(fatsat.static_signal(s["hypodermis"])) for s in samples]))):
+        d = stat_v - level
+        print(f"  paired, stagnant blood - {name}: {np.median(d):+.3f} "
+              f"[{np.percentile(d, 5):+.3f}, {np.percentile(d, 95):+.3f}], brighter in {np.mean(d > 0):.0%} of draws")
 
     save(fig, "fig1b_regime", n=N_DRAWS, seed=SEED,
          note=f"Simulation only; literature tissue parameters, no measured data. "

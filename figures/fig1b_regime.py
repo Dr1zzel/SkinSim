@@ -70,7 +70,19 @@ def sequences() -> tuple[TofSequence, TofSequence]:
 
 
 def blood_at(seq: TofSequence, sample: TissueSample, velocity: float) -> float:
-    """Return slab-mean blood signal for one tissue sample at one velocity."""
+    """Return slab-mean blood signal for one tissue sample at one velocity.
+
+    Geometry: polar 90 deg with the slab at orientation 90 deg makes the vessel
+    direction PARALLEL TO THE SLAB NORMAL, so the vessel crosses the slab end-on
+    over the full 12 mm and the whole velocity counts towards the crossing. That
+    is the BEST case for inflow - any other angle lengthens the path through the
+    slab and saturates the blood further - so the inversion reported here is the
+    conservative end of the result, not the worst case.
+
+    The returned value is the mean over 32 points along that path, so it mixes
+    fresh blood at the entry face with saturated blood at the exit. A maximum
+    intensity projection would weight the entry end more heavily.
+    """
     vessel = Vessel(depth_mm=5.0, polar_deg=90.0, azimuth_deg=0.0,
                     diameter_mm=HAEMODYNAMICS["target_diameter"].nominal)
     flow = FlowGeometry(vessel, Slab(thickness_mm=SLAB_MM, orientation_deg=90.0),
@@ -168,8 +180,8 @@ def main() -> None:
     ax.set_ylabel("simulated signal\n(1 = full dermis magnetisation)", color=INK_2)
     ax.set_title("Fat suppression, not inflow, is what makes a cutaneous vessel visible",
                  fontsize=10.5, color=INK, loc="left", pad=16)
-    ax.text(0, 1.015, f"spoiled-GRE TOF, TR {TR_MS:g} ms, {FLIP_DEG:g}°, {SLAB_MM:g} mm slab; "
-                      f"gap to the stagnant line = the inflow gain",
+    ax.text(0, 1.015, f"spoiled-GRE TOF, TR {TR_MS:g} ms, {FLIP_DEG:g}°, vessel crossing a {SLAB_MM:g} mm slab "
+                      f"end-on; gap to the stagnant line = the inflow gain",
             transform=ax.transAxes, fontsize=8.5, color=INK_2)
     ax.grid(color=GRID, lw=0.6, zorder=0)
     ax.tick_params(colors=INK_2, labelsize=8)

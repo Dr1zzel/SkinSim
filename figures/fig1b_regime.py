@@ -42,8 +42,8 @@ SEED, N_DRAWS = 20261014, 96
 TR_MS, FLIP_DEG = 35.0, 20.0
 SLAB_MM = 12.0  # stated: the transit time that governs inflow is SLAB_MM / velocity
 INPLANE_MM = 0.3
-VELOCITIES = np.geomspace(1.5, 800.0, 64)
-INTRACRANIAL_MM_S = (200.0, 600.0)  # typical TOF operating range, for scale only
+VELOCITIES = np.geomspace(2.0, 300.0, 64)
+INTRACRANIAL_MM_S = (200.0, 300.0)  # lower end of the 200-600 mm/s TOF range; arrow marks the rest
 KEYS = ("arterial_blood", "hypodermis", "dermis")
 
 
@@ -129,11 +129,11 @@ def main() -> None:
     samples, draw_velocities = draw()
     plain, fatsat = sequences()
     blood = blood_curve(plain, samples)  # blood is on-resonance: the fat pulse leaves it untouched
-    v25, v75 = np.percentile(cutaneous_velocities(), [25, 75])
+    v_lo, v_hi = np.percentile(cutaneous_velocities(), [5, 95])
 
     fig, ax = plt.subplots(figsize=(7.4, 4.8))
     fig.subplots_adjust(left=0.10, right=0.775, top=0.835, bottom=0.145)
-    ax.axvspan(v25, v75, color=INK, alpha=0.06, lw=0, zorder=0)
+    ax.axvspan(v_lo, v_hi, color=INK, alpha=0.06, lw=0, zorder=0)
 
     fat_u = hline(ax, flat(plain, samples, "hypodermis"), FAT_C, "-")
     fat_s = hline(ax, flat(fatsat, samples, "hypodermis"), FAT_C, "--")
@@ -157,8 +157,8 @@ def main() -> None:
     ax.plot([x5, x95], [fat_u, fat_u], color=BLOOD_C, lw=3.4, solid_capstyle="butt", alpha=0.45, zorder=6)
     ax.plot([x50], [fat_u], "o", ms=8.5, mfc="white", mec=BLOOD_C, mew=2.2, zorder=7)
 
-    ax.annotate(f"vessel darker than\nthe fat around it\n{frac:.0%} of draws",
-                (np.sqrt(VELOCITIES[0] * x50), fat_u * 0.82), ha="center", va="center",
+    ax.annotate(f"vessel darker\nthan the fat\n{frac:.0%} of draws",
+                (VELOCITIES[0] * 1.9, fat_u * 0.80), ha="center", va="center",
                 fontsize=8.5, color=BLOOD_C, weight="bold", zorder=8)
     ax.annotate(f"every draw inverts,\nbetween {x5:.0f} and {x95:.0f} mm/s",
                 (x95, fat_u), xytext=(10, 26), textcoords="offset points",
@@ -166,12 +166,14 @@ def main() -> None:
                 bbox=dict(fc="white", ec="none", alpha=0.9, pad=2.0),
                 arrowprops=dict(arrowstyle="-", color=INK_2, lw=0.9, connectionstyle="arc3,rad=0.3"))
 
-    ax.annotate(f"target cutaneous vessels\n{v25:.0f}-{v75:.0f} mm/s", (np.sqrt(v25 * v75), 0.487),
-                ha="center", va="top", fontsize=8, color=INK)
+    ax.annotate(f"target cutaneous vessels\n{v_lo:.0f}-{v_hi:.0f} mm/s (5-95 % of draws)",
+                (np.sqrt(v_lo * v_hi), 0.487), ha="center", va="top", fontsize=8, color=INK)
     ic = INTRACRANIAL_MM_S
     ax.plot(ic, [0.468, 0.468], color=INK_2, lw=2.6, solid_capstyle="butt", alpha=0.5)
-    ax.annotate("conventional TOF\noperates here", (np.sqrt(ic[0] * ic[1]), 0.461), ha="center", va="top",
+    ax.annotate("conventional TOF\n200-600 mm/s", (ic[0], 0.461), ha="left", va="top",
                 fontsize=8, color=INK_2)
+    ax.annotate("", (ic[1], 0.468), xytext=(ic[0], 0.468),
+                arrowprops=dict(arrowstyle="-|>", color=INK_2, lw=2.0, alpha=0.55))
 
     for y, text, colour, weight in ((mid[-1], "blood, inflowing", BLOOD_C, "bold"),
                                     (fat_u, "subcutaneous fat", FAT_C, "normal"),
@@ -184,18 +186,23 @@ def main() -> None:
     ax.set(xscale="log", xlim=(VELOCITIES[0], VELOCITIES[-1]), ylim=(0, 0.50))
     ax.set_xlabel(f"mean blood velocity (mm/s)      —      {SLAB_MM:g} mm slab, so 10 mm/s is a "
                   f"{SLAB_MM / 10:.1f} s crossing", color=INK_2, fontsize=9)
-    ax.set_ylabel("signal, relative to dermis $M_0$", color=INK_2)
+    ax.set_ylabel("simulated signal\n(1 = full dermis magnetisation)", color=INK_2)
     ax.set_title("Against unsuppressed fat, most target vessels invert before they are ever imaged",
                  fontsize=10.5, color=INK, loc="left", pad=17)
     ax.text(0, 1.016, f"spoiled-GRE TOF, TR {TR_MS:g} ms, {FLIP_DEG:g}°, {SLAB_MM:g} mm slab, "
                       f"vessel lying in the slab plane", transform=ax.transAxes, fontsize=8.5, color=INK_2)
+    from matplotlib.ticker import FixedFormatter, FixedLocator
+    ticks = [2, 3, 5, 10, 20, 30, 50, 100, 200, 300]
+    ax.xaxis.set_major_locator(FixedLocator(ticks))
+    ax.xaxis.set_major_formatter(FixedFormatter([str(t) for t in ticks]))
+    ax.xaxis.set_minor_locator(FixedLocator([]))
     ax.grid(color=GRID, lw=0.6, zorder=0)
     ax.tick_params(colors=INK_2, labelsize=8)
     for side in ("top", "right"):
         ax.spines[side].set_visible(False)
 
     print(f"Backgrounds (median, dermis M0): fat {fat_u:.3f}, fat suppressed {fat_s:.3f}, dermis {derm:.3f}")
-    print(f"Target cutaneous velocity IQR {v25:.0f}-{v75:.0f} mm/s")
+    print(f"Target cutaneous velocity 5-95 % of draws: {v_lo:.0f}-{v_hi:.0f} mm/s")
     print(f"Inversion against unsuppressed fat: {len(xs)}/{N_DRAWS} draws invert; "
           f"velocity {x50:.0f} mm/s [{x5:.0f}-{x95:.0f}], transit {SLAB_MM / x50:.2f} s "
           f"[{SLAB_MM / x95:.2f}-{SLAB_MM / x5:.2f}]")

@@ -118,7 +118,9 @@ def save(fig: plt.Figure, name: str, n: int = N_DRAWS, seed: int = SEED, note: s
     """
     if note is None:
         note = f"Literature parameters only, no measured data. LHS seed {seed}, {n} draws; bands 5-95 %, lines median."
-    fig.get_layout_engine().set(rect=(0, 0.03, 1, 0.97))
+    engine = fig.get_layout_engine()
+    if engine is not None:  # figures that place their own axes manage their own margins
+        engine.set(rect=(0, 0.03, 1, 0.97))
     fig.text(0.01, 0.005, note, fontsize=7, color=INK_2, ha="left", va="bottom")
     out = ROOT / "figures" / f"{name}.png"
     fig.savefig(out, dpi=200, metadata={"Date": None, "Description": note})

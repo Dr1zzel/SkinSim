@@ -110,9 +110,14 @@ def label_grid(axes: np.ndarray, xlabel: str, ylabel: str) -> None:
         ax.set_ylabel(ylabel, color=INK_2)
 
 
-def save(fig: plt.Figure, name: str, n: int = N_DRAWS, seed: int = SEED) -> Path:
-    """Save the figure reproducibly with the draw recorded on it and in its metadata."""
-    note = f"Literature parameters only, no measured data. LHS seed {seed}, {n} draws; bands 5-95 %, lines median."
+def save(fig: plt.Figure, name: str, n: int = N_DRAWS, seed: int = SEED, note: str | None = None) -> Path:
+    """Save the figure reproducibly with the draw recorded on it and in its metadata.
+
+    ``note`` overrides the default provenance line, for figures built on nominal
+    parameters rather than a Latin-hypercube draw.
+    """
+    if note is None:
+        note = f"Literature parameters only, no measured data. LHS seed {seed}, {n} draws; bands 5-95 %, lines median."
     fig.get_layout_engine().set(rect=(0, 0.03, 1, 0.97))
     fig.text(0.01, 0.005, note, fontsize=7, color=INK_2, ha="left", va="bottom")
     out = ROOT / "figures" / f"{name}.png"

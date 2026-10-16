@@ -143,20 +143,28 @@ def main() -> None:
     ax.fill_between(VELOCITIES, lo, hi, color=BLOOD_C, alpha=0.16, lw=0, zorder=4)
     ax.plot(VELOCITIES, mid, color=BLOOD_C, lw=2.4, zorder=5)
 
+    frac = float(np.mean([blood_at(plain, s["arterial_blood"], float(v)) < float(plain.static_signal(s["hypodermis"]))
+                          for s, v in zip(samples, draw_velocities)]))
+
+    # The region where the vessel is darker than the fat around it, as an area.
+    dark = mid < fat_u
+    ax.fill_between(VELOCITIES, mid, fat_u, where=dark, color=BLOOD_C, alpha=0.30,
+                    lw=0, zorder=2, interpolate=True)
+
     # Where each draw's vessel goes dark against its own unsuppressed fat.
     xs = crossing_velocities(plain, samples, "hypodermis")
     x5, x50, x95 = np.percentile(xs, [5, 50, 95])
     ax.plot([x5, x95], [fat_u, fat_u], color=BLOOD_C, lw=3.4, solid_capstyle="butt", alpha=0.45, zorder=6)
     ax.plot([x50], [fat_u], "o", ms=8.5, mfc="white", mec=BLOOD_C, mew=2.2, zorder=7)
 
-    frac = float(np.mean([blood_at(plain, s["arterial_blood"], float(v)) < float(plain.static_signal(s["hypodermis"]))
-                          for s, v in zip(samples, draw_velocities)]))
-    ax.annotate(f"every draw inverts somewhere in {x5:.0f}-{x95:.0f} mm/s\n"
-                f"below it the vessel is darker than the fat around it",
-                (x50, fat_u), xytext=(16, -44), textcoords="offset points",
-                ha="left", va="center", fontsize=8.5, color=INK, zorder=8,
-                bbox=dict(fc="white", ec="none", alpha=0.88, pad=2.0),
-                arrowprops=dict(arrowstyle="-", color=INK_2, lw=0.9, connectionstyle="arc3,rad=-0.3"))
+    ax.annotate(f"vessel darker than\nthe fat around it\n{frac:.0%} of draws",
+                (np.sqrt(VELOCITIES[0] * x50), fat_u * 0.82), ha="center", va="center",
+                fontsize=8.5, color=BLOOD_C, weight="bold", zorder=8)
+    ax.annotate(f"every draw inverts,\nbetween {x5:.0f} and {x95:.0f} mm/s",
+                (x95, fat_u), xytext=(10, 26), textcoords="offset points",
+                ha="left", va="bottom", fontsize=8.5, color=INK, zorder=8,
+                bbox=dict(fc="white", ec="none", alpha=0.9, pad=2.0),
+                arrowprops=dict(arrowstyle="-", color=INK_2, lw=0.9, connectionstyle="arc3,rad=0.3"))
 
     ax.annotate(f"target cutaneous vessels\n{v25:.0f}-{v75:.0f} mm/s", (np.sqrt(v25 * v75), 0.487),
                 ha="center", va="top", fontsize=8, color=INK)
@@ -177,7 +185,7 @@ def main() -> None:
     ax.set_xlabel(f"mean blood velocity (mm/s)      —      {SLAB_MM:g} mm slab, so 10 mm/s is a "
                   f"{SLAB_MM / 10:.1f} s crossing", color=INK_2, fontsize=9)
     ax.set_ylabel("signal, relative to dermis $M_0$", color=INK_2)
-    ax.set_title("Inflow fades across the cutaneous range — and the background decides what is left",
+    ax.set_title("Against unsuppressed fat, most target vessels invert before they are ever imaged",
                  fontsize=10.5, color=INK, loc="left", pad=17)
     ax.text(0, 1.016, f"spoiled-GRE TOF, TR {TR_MS:g} ms, {FLIP_DEG:g}°, {SLAB_MM:g} mm slab, "
                       f"vessel lying in the slab plane", transform=ax.transAxes, fontsize=8.5, color=INK_2)

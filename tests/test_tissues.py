@@ -50,7 +50,9 @@ def test_lhs_draws_are_deterministic_stratified_and_inside_intervals():
     for key, p in params.items():
         np.testing.assert_array_equal(a[key], b[key])
         assert p.lo <= a[key].min() and a[key].max() <= p.hi
-    u = np.log(a["target_vessel_velocity"] / 10.0) / np.log(15.0)  # log-uniform -> one draw per stratum
+    # log-uniform -> exactly one draw per stratum; bounds read from the table, never hard-coded
+    v = params["target_vessel_velocity"]
+    u = np.log(a["target_vessel_velocity"] / v.lo) / np.log(v.hi / v.lo)
     assert sorted(np.floor(u * 64).astype(int)) == list(range(64))
     assert not np.array_equal(sample(params, 64, seed=4)["dermis.t1_ms"], a["dermis.t1_ms"])
 

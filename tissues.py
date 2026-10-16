@@ -198,15 +198,22 @@ ARTERIOLE_VELOCITY = Param(
     1.0, 5.0, 2.5, L, "inferred; ascending arterioles and plexus, ~20-50 um", log=True)
 
 TARGET_VESSEL_VELOCITY = Param(
-    10.0, 150.0, 40.0, L,
-    "Mean velocity of 0.3-1 mm cutaneous arteries and veins. Revised 14 Oct 2026 upward from "
-    "SkinMRA's 5-50 mm/s, which was set for the 100-500 um plexus, on anatomical grounds and "
-    "NOT from the October images: vessels of this calibre are small named cutaneous arteries "
-    "and veins, an order of magnitude faster than the plexus. Microvascular mean velocity "
-    "rises roughly in proportion to diameter (Lipowsky, Microcirculation 2005; Zweifach & "
-    "Lipowsky, Circ Res 1977), extrapolating to tens of mm/s at 0.3 mm; Doppler ultrasound of "
-    "~1 mm peripheral arteries (e.g. digital arteries) reports mean velocities of several cm/s. "
-    "Veins sit at the low end. VERIFY all three; swept, never a fixed assumption", log=True)
+    5.0, 25.0, 14.0, L,
+    "mm/s. Time-averaged mean velocity of the 100-500 um target vessels (SKIN-COILS WP3). "
+    "Revised DOWN 16 Oct 2026 from 10-150 mm/s, and not from any image: that entry was "
+    "explicitly written for 0.3-1 mm vessels and was then being applied to a target one "
+    "calibre band smaller. No direct measurement of velocity in 100-500 um human subcutaneous "
+    "vessels was found - they fall between what capillaroscopy and what duplex can reach - so "
+    "the range is BRACKETED between the two calibres that are measured, and interpolated. "
+    "Lower anchor: nailfold capillaroscopy, ~12.5 um at ~0.65 mm/s (CAPILLARY_VELOCITY above). "
+    "Upper anchor: lower-limb cutaneous perforators, mean diameter 1.93 mm, peak systolic "
+    "16.9 cm/s with resistance index 0.71, so a time-averaged mean of ~89 mm/s (Visconti et al., "
+    "J Reconstr Microsurg 2021;37(1):75-82, doi:10.1055/s-0040-1702162). A power law through "
+    "those two anchors, 154x apart in diameter, gives v ~ d^0.98 - indistinguishable from the "
+    "v ~ d of Murray's law, which is the scaling expected on theoretical grounds and is the "
+    "reason to trust the interpolation. That yields 4.9 mm/s at 100 um and 23.8 mm/s at 500 um. "
+    "Still LOW confidence: interpolated, arterial, and resting. Swept, never a fixed assumption",
+    log=True)
 
 THERMOREGULATORY_FACTOR = Param(
     0.3, 3.0, 1.0, M, "skin perfusion swings an order of magnitude with thermoregulation; "

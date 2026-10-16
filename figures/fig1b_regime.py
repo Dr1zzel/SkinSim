@@ -1,22 +1,28 @@
-"""Figure 1b: why cutaneous TOF is a different problem, in absolute signal.
+"""Figure 1b: what inflow buys in skin, and which background it has to beat.
 
-One panel, one message. As blood slows into the cutaneous range, inflow
-enhancement is progressively spent and the slab-mean blood signal falls toward
-the static steady state. Whether the vessel is still visible there is decided
-by the background it sits against, which in skin is set by depth:
+One panel. Blood signal against velocity, with the four levels it is measured
+against drawn as flat references:
 
-  - against DERMIS (shallow), blood stays above the background at every
-    physiological velocity;
-  - against UNSUPPRESSED SUBCUTANEOUS FAT (1-10 mm, where the target vessels
-    are), blood falls BELOW the background and the vessel inverts. Every draw
-    in the literature parameter ranges inverts somewhere; only the velocity at
-    which it happens is uncertain, and that velocity lands inside the target
-    range;
-  - with the fat suppressed, the background collapses to near zero and the
-    inversion disappears entirely.
+    blood, stagnant       the spoiled-GRE fixed point - a vessel with no flow.
+                          The gap between it and the curve IS the inflow
+                          enhancement, so the figure shows inflow rather than
+                          asking the reader to assume it.
+    subcutaneous fat      the background at the 1-10 mm target depth.
+    fat, suppressed       the same background with a fat-saturation pulse.
+    dermis                the background for the shallowest vessels.
 
-Conventional TOF operates two decades to the right of this, on the plateau,
-which is why its parameter choices do not transfer.
+Two things follow, and they are different claims:
+
+  - inflow still works: 1.4x at 3 mm/s to 3.4x at 70 mm/s over the stagnant
+    floor, so it is not exhausted at cutaneous velocities;
+  - but it is not what makes the vessel visible. Stagnant blood already beats
+    dermis and suppressed fat. Inflow is load-bearing only against UNSUPPRESSED
+    fat, where stagnant blood sits at 0.42x the background - and there it
+    fails, inverting in every parameter draw.
+
+Layout: the velocity regimes sit on a rail below the axes rather than as shaded
+bands inside it, and the numbers belong in the caption rather than in callouts,
+so the plot area carries curves and nothing else.
 
 Every number is read from tissues.py and protocols.py. No measured data.
 
@@ -37,21 +43,14 @@ from tissues import HAEMODYNAMICS, PARAM_FIELDS, sample_tissues
 
 # Validated two-hue pair (dataviz validator, light surface): blood vs fat.
 BLOOD_C, FAT_C = SERIES[1], SERIES[0]
+DOTTED = (0, (1.2, 1.8))
 
 SEED, N_DRAWS = 20261014, 96
-TR_MS, FLIP_DEG = 35.0, 20.0
-SLAB_MM = 12.0  # stated: the transit time that governs inflow is SLAB_MM / velocity
-INPLANE_MM = 0.3
+TR_MS, FLIP_DEG, SLAB_MM, INPLANE_MM = 35.0, 20.0, 12.0, 0.3
 VELOCITIES = np.geomspace(2.0, 300.0, 64)
-INTRACRANIAL_MM_S = (200.0, 300.0)  # lower end of the 200-600 mm/s TOF range; arrow marks the rest
+CONVENTIONAL_TOF = (200.0, 600.0)  # intracranial / run-off TOF, for scale
+TICKS = (2, 3, 5, 10, 20, 30, 50, 100, 200, 300)
 KEYS = ("arterial_blood", "hypodermis", "dermis")
-
-
-def cutaneous_velocities(n: int = 4096) -> np.ndarray:
-    """Return drawn cutaneous velocities, target velocity times the thermoregulatory factor."""
-    _, others = sample_tissues(["arterial_blood"], n, SEED,
-                               haemodynamic_keys=("target_vessel_velocity", "thermoregulatory_factor"))
-    return np.asarray(others["target_vessel_velocity"]) * np.asarray(others["thermoregulatory_factor"])
 
 
 def draw() -> tuple[list[dict[str, TissueSample]], np.ndarray]:
@@ -70,43 +69,28 @@ def sequences() -> tuple[TofSequence, TofSequence]:
             TofSequence(timing=timing, flip_deg=FLIP_DEG, modules=(SaturationModule("fatsat_s", 8.0),)))
 
 
-def _flow(velocity: float) -> FlowGeometry:
-    """Return the laminar flow geometry of a target vessel lying in the slab plane."""
-    slab = Slab(thickness_mm=SLAB_MM, orientation_deg=90.0)
-    vessel = Vessel(depth_mm=5.0, polar_deg=90.0, azimuth_deg=0.0,
-                    diameter_mm=HAEMODYNAMICS["target_diameter"].nominal)
-    return FlowGeometry(vessel, slab, velocity, N_SHELLS, SLAB_MM * 1.001)
-
-
 def blood_at(seq: TofSequence, sample: TissueSample, velocity: float) -> float:
     """Return slab-mean blood signal for one tissue sample at one velocity."""
-    flow = _flow(velocity)
+    vessel = Vessel(depth_mm=5.0, polar_deg=90.0, azimuth_deg=0.0,
+                    diameter_mm=HAEMODYNAMICS["target_diameter"].nominal)
+    flow = FlowGeometry(vessel, Slab(thickness_mm=SLAB_MM, orientation_deg=90.0),
+                        velocity, N_SHELLS, SLAB_MM * 1.001)
     return float(np.mean(seq.blood_signal(sample, flow, np.linspace(0.0, flow.path_mm(), 32))))
 
 
-def blood_curve(seq: TofSequence, samples: list[dict[str, TissueSample]]) -> np.ndarray:
-    """Return slab-mean blood signal, shape (velocities, draws)."""
-    return np.array([[blood_at(seq, s["arterial_blood"], v) for s in samples] for v in VELOCITIES])
-
-
-def flat(seq: TofSequence, samples: list[dict[str, TissueSample]], key: str) -> np.ndarray:
-    """Return the static steady-state signal of one tissue over the draws."""
-    return np.array([float(seq.static_signal(s[key])) for s in samples])
-
-
 def crossing_velocities(seq: TofSequence, samples: list[dict[str, TissueSample]], key: str) -> np.ndarray:
-    """Return, per draw, the velocity at which that draw's blood falls below that draw's own background.
+    """Return, per draw, the velocity at which that draw's blood falls below its own background.
 
-    Solved by bisection in log velocity rather than read off the plotting grid,
-    so the quoted bounds do not move when the grid is refined.
+    Solved by bisection in log velocity, not read off the plotting grid, so the
+    bounds do not move when the grid is refined.
     """
     from scipy.optimize import brentq
 
     out = []
     for s in samples:
-        background = float(seq.static_signal(s[key]))
+        level = float(seq.static_signal(s[key]))
 
-        def excess(log_v: float, sample=s["arterial_blood"], g=background) -> float:
+        def excess(log_v: float, sample=s["arterial_blood"], g=level) -> float:
             return blood_at(seq, sample, float(np.exp(log_v))) - g
 
         lo, hi = np.log(VELOCITIES[0]), np.log(VELOCITIES[-1])
@@ -115,117 +99,93 @@ def crossing_velocities(seq: TofSequence, samples: list[dict[str, TissueSample]]
     return np.array(out)
 
 
-def hline(ax, values: np.ndarray, colour: str, style: str, alpha: float = 0.07) -> float:
-    """Draw a velocity-independent background as a median line with its 5-95 % band; return the median."""
-    lo, mid, hi = np.percentile(values, [5, 50, 95])
-    if alpha:
-        ax.axhspan(lo, hi, color=colour, alpha=alpha, lw=0, zorder=1)
-    ax.axhline(mid, color=colour, lw=1.8, ls=style, zorder=3)
+def reference(ax, values, colour: str, style, label: str, band: bool = False) -> float:
+    """Draw a velocity-independent level as a line, label it in the right margin, return its median."""
+    lo, mid, hi = np.percentile(np.asarray(values, dtype=float), [5, 50, 95])
+    if band:
+        ax.axhspan(lo, hi, color=colour, alpha=0.055, lw=0, zorder=1)
+    ax.axhline(mid, color=colour, lw=1.7, ls=style, zorder=3)
+    ax.annotate(label, (1.0, mid), xycoords=("axes fraction", "data"), xytext=(7, 0),
+                textcoords="offset points", va="center", fontsize=8.5, color=colour,
+                annotation_clip=False)
     return float(mid)
 
 
+def regime_rail(ax, target: tuple[float, float]) -> None:
+    """Draw the velocity regimes on a rail below the axes, keeping the plot area for curves."""
+    t = ax.get_xaxis_transform()
+    for (lo, hi), colour, text in ((target, INK, "target cutaneous vessels"),
+                                   (CONVENTIONAL_TOF, INK_2, "conventional TOF")):
+        drawn_hi = min(hi, VELOCITIES[-1])
+        ax.plot([lo, drawn_hi], [-0.09, -0.09], transform=t, color=colour, lw=3.2, alpha=0.5,
+                solid_capstyle="butt", clip_on=False, zorder=5)
+        ax.annotate(f"{text}\n{lo:.0f}-{hi:.0f} mm/s", (np.sqrt(lo * drawn_hi), -0.125), xycoords=t,
+                    ha="center", va="top", fontsize=8, color=colour, clip_on=False)
+
+
 def main() -> None:
-    """Build the panel and print the numbers behind it."""
-    samples, draw_velocities = draw()
+    """Build the panel and print every number the caption needs."""
+    samples, drawn_v = draw()
     plain, fatsat = sequences()
-    blood = blood_curve(plain, samples)  # blood is on-resonance: the fat pulse leaves it untouched
-    v_lo, v_hi = np.percentile(cutaneous_velocities(), [5, 95])
+    v_lo, v_hi = np.percentile(drawn_v, [5, 95])
 
-    fig, ax = plt.subplots(figsize=(7.4, 4.8))
-    fig.subplots_adjust(left=0.10, right=0.775, top=0.835, bottom=0.145)
-    ax.axvspan(v_lo, v_hi, color=INK, alpha=0.06, lw=0, zorder=0)
+    fig, ax = plt.subplots(figsize=(7.6, 4.9))
+    fig.subplots_adjust(left=0.115, right=0.775, top=0.85, bottom=0.26)
 
-    stat_b = hline(ax, flat(plain, samples, "arterial_blood"), BLOOD_C, (0, (1, 1.6)), alpha=0.0)
-    fat_u = hline(ax, flat(plain, samples, "hypodermis"), FAT_C, "-")
-    fat_s = hline(ax, flat(fatsat, samples, "hypodermis"), FAT_C, "--")
-    derm = hline(ax, flat(plain, samples, "dermis"), INK_2, ":", alpha=0.0)
-
+    blood = np.array([[blood_at(plain, s["arterial_blood"], v) for s in samples] for v in VELOCITIES])
     lo, mid, hi = np.percentile(blood, [5, 50, 95], axis=-1)
-    ax.fill_between(VELOCITIES, lo, hi, color=BLOOD_C, alpha=0.16, lw=0, zorder=4)
-    ax.plot(VELOCITIES, mid, color=BLOOD_C, lw=2.4, zorder=5)
 
-    frac = float(np.mean([blood_at(plain, s["arterial_blood"], float(v)) < float(plain.static_signal(s["hypodermis"]))
-                          for s, v in zip(samples, draw_velocities)]))
+    fat_u = reference(ax, [plain.static_signal(s["hypodermis"]) for s in samples], FAT_C, "-",
+                      "subcutaneous fat", band=True)
+    fat_s = reference(ax, [fatsat.static_signal(s["hypodermis"]) for s in samples], FAT_C, "--",
+                      "fat, suppressed", band=True)
+    derm = reference(ax, [plain.static_signal(s["dermis"]) for s in samples], INK_2, DOTTED, "dermis")
+    stat = reference(ax, [plain.static_signal(s["arterial_blood"]) for s in samples], BLOOD_C, DOTTED,
+                     "blood, stagnant")
 
-    # The region where the vessel is darker than the fat around it, as an area.
-    dark = mid < fat_u
-    ax.fill_between(VELOCITIES, mid, fat_u, where=dark, color=BLOOD_C, alpha=0.30,
+    # The inversion as an area, not a crossing the reader has to decode.
+    ax.fill_between(VELOCITIES, mid, fat_u, where=mid < fat_u, color=BLOOD_C, alpha=0.26,
                     lw=0, zorder=2, interpolate=True)
+    ax.fill_between(VELOCITIES, lo, hi, color=BLOOD_C, alpha=0.15, lw=0, zorder=4)
+    ax.plot(VELOCITIES, mid, color=BLOOD_C, lw=2.5, zorder=5)
+    ax.annotate("blood, inflowing", (1.0, mid[-1]), xycoords=("axes fraction", "data"), xytext=(7, 0),
+                textcoords="offset points", va="center", fontsize=8.5, color=BLOOD_C,
+                weight="bold", annotation_clip=False)
 
-    # Where each draw's vessel goes dark against its own unsuppressed fat.
     xs = crossing_velocities(plain, samples, "hypodermis")
     x5, x50, x95 = np.percentile(xs, [5, 50, 95])
-    ax.plot([x5, x95], [fat_u, fat_u], color=BLOOD_C, lw=3.4, solid_capstyle="butt", alpha=0.45, zorder=6)
-    ax.plot([x50], [fat_u], "o", ms=8.5, mfc="white", mec=BLOOD_C, mew=2.2, zorder=7)
+    frac = float(np.mean([blood_at(plain, s["arterial_blood"], float(v)) < float(plain.static_signal(s["hypodermis"]))
+                          for s, v in zip(samples, drawn_v)]))
+    ax.plot([x50], [fat_u], "o", ms=8, mfc="white", mec=BLOOD_C, mew=2.1, zorder=7)
+    ax.annotate(f"darker than fat\n{frac:.0%} of draws", (VELOCITIES[0] * 1.95, fat_u * 0.78),
+                ha="center", va="center", fontsize=8.5, color=BLOOD_C, weight="bold", zorder=8)
 
-    ax.annotate(f"vessel darker\nthan the fat\n{frac:.0%} of draws",
-                (VELOCITIES[0] * 1.9, fat_u * 0.80), ha="center", va="center",
-                fontsize=8.5, color=BLOOD_C, weight="bold", zorder=8)
-    i_lo = int(np.argmin(np.abs(VELOCITIES - v_lo)))
-    i_hi = int(np.argmin(np.abs(VELOCITIES - v_hi)))
-    ax.annotate("", (v_hi, stat_b), xytext=(v_hi, mid[i_hi]),
-                arrowprops=dict(arrowstyle="<->", color=INK, lw=1.3, shrinkA=0, shrinkB=0))
-    ax.annotate(f"inflow adds\n{mid[i_lo] / stat_b:.1f}x to {mid[i_hi] / stat_b:.1f}x",
-                (v_hi, np.sqrt(stat_b * mid[i_hi])), xytext=(9, 0), textcoords="offset points",
-                ha="left", va="center", fontsize=8.5, color=INK, zorder=9,
-                bbox=dict(fc="white", ec="none", alpha=0.9, pad=1.6))
-
-    ax.annotate(f"every draw inverts,\nbetween {x5:.0f} and {x95:.0f} mm/s",
-                (x95, fat_u), xytext=(10, 26), textcoords="offset points",
-                ha="left", va="bottom", fontsize=8.5, color=INK, zorder=8,
-                bbox=dict(fc="white", ec="none", alpha=0.9, pad=2.0),
-                arrowprops=dict(arrowstyle="-", color=INK_2, lw=0.9, connectionstyle="arc3,rad=0.3"))
-
-    ax.annotate(f"target cutaneous vessels\n{v_lo:.0f}-{v_hi:.0f} mm/s (5-95 % of draws)",
-                (np.sqrt(v_lo * v_hi), 0.487), ha="center", va="top", fontsize=8, color=INK)
-    ic = INTRACRANIAL_MM_S
-    ax.plot(ic, [0.468, 0.468], color=INK_2, lw=2.6, solid_capstyle="butt", alpha=0.5)
-    ax.annotate("conventional TOF\n200-600 mm/s", (ic[0], 0.461), ha="left", va="top",
-                fontsize=8, color=INK_2)
-    ax.annotate("", (ic[1], 0.468), xytext=(ic[0], 0.468),
-                arrowprops=dict(arrowstyle="-|>", color=INK_2, lw=2.0, alpha=0.55))
-
-    for y, text, colour, weight in ((mid[-1], "blood, inflowing", BLOOD_C, "bold"),
-                                    (stat_b, "blood, no flow", BLOOD_C, "normal"),
-                                    (fat_u, "subcutaneous fat", FAT_C, "normal"),
-                                    (derm, "dermis", INK_2, "normal"),
-                                    (fat_s, "fat, suppressed", FAT_C, "normal")):
-        ax.annotate(text, (1.0, y), xycoords=("axes fraction", "data"), xytext=(7, 0),
-                    textcoords="offset points", va="center", fontsize=8.5, color=colour,
-                    weight=weight, annotation_clip=False)
-
-    ax.set(xscale="log", xlim=(VELOCITIES[0], VELOCITIES[-1]), ylim=(0, 0.50))
-    ax.set_xlabel(f"mean blood velocity (mm/s)      —      {SLAB_MM:g} mm slab, so 10 mm/s is a "
-                  f"{SLAB_MM / 10:.1f} s crossing", color=INK_2, fontsize=9)
+    ax.set(xscale="log", xlim=(VELOCITIES[0], VELOCITIES[-1]), ylim=(0, 0.45), xticks=TICKS)
+    ax.set_xticklabels([str(t) for t in TICKS])
+    ax.xaxis.set_minor_locator(plt.NullLocator())
+    ax.set_xlabel("mean blood velocity (mm/s)", color=INK_2, labelpad=40)
     ax.set_ylabel("simulated signal\n(1 = full dermis magnetisation)", color=INK_2)
-    ax.set_title("Against unsuppressed fat, most target vessels invert before they are ever imaged",
-                 fontsize=10.5, color=INK, loc="left", pad=17)
-    ax.text(0, 1.016, f"spoiled-GRE TOF, TR {TR_MS:g} ms, {FLIP_DEG:g}°, {SLAB_MM:g} mm slab, "
-                      f"vessel lying in the slab plane", transform=ax.transAxes, fontsize=8.5, color=INK_2)
-    from matplotlib.ticker import FixedFormatter, FixedLocator
-    ticks = [2, 3, 5, 10, 20, 30, 50, 100, 200, 300]
-    ax.xaxis.set_major_locator(FixedLocator(ticks))
-    ax.xaxis.set_major_formatter(FixedFormatter([str(t) for t in ticks]))
-    ax.xaxis.set_minor_locator(FixedLocator([]))
+    ax.set_title("Inflow is not what makes a cutaneous vessel visible — the background is",
+                 fontsize=10.5, color=INK, loc="left", pad=16)
+    ax.text(0, 1.015, f"spoiled-GRE TOF, TR {TR_MS:g} ms, {FLIP_DEG:g}°, {SLAB_MM:g} mm slab; "
+                      f"gap to the stagnant line = the inflow gain",
+            transform=ax.transAxes, fontsize=8.5, color=INK_2)
     ax.grid(color=GRID, lw=0.6, zorder=0)
     ax.tick_params(colors=INK_2, labelsize=8)
     for side in ("top", "right"):
         ax.spines[side].set_visible(False)
+    regime_rail(ax, (v_lo, v_hi))
 
-    print(f"Blood with NO flow (spoiled-GRE fixed point): {stat_b:.3f} = "
-          f"{stat_b / derm:.2f}x dermis, {stat_b / fat_s:.1f}x suppressed fat, {stat_b / fat_u:.2f}x fat")
-    print(f"Inflow enhancement over that floor: {mid[i_lo] / stat_b:.2f}x at {v_lo:.0f} mm/s, "
-          f"{mid[i_hi] / stat_b:.2f}x at {v_hi:.0f} mm/s")
-    print(f"Backgrounds (median, dermis M0): fat {fat_u:.3f}, fat suppressed {fat_s:.3f}, dermis {derm:.3f}")
-    print(f"Target cutaneous velocity 5-95 % of draws: {v_lo:.0f}-{v_hi:.0f} mm/s")
-    print(f"Inversion against unsuppressed fat: {len(xs)}/{N_DRAWS} draws invert; "
-          f"velocity {x50:.0f} mm/s [{x5:.0f}-{x95:.0f}], transit {SLAB_MM / x50:.2f} s "
-          f"[{SLAB_MM / x95:.2f}-{SLAB_MM / x5:.2f}]")
-    print(f"Joint draws (own velocity AND own tissue parameters) darker than unsuppressed fat: {frac:.0%}")
-    print(f"Against suppressed fat the median curve never inverts: min ratio {np.min(mid) / fat_s:.1f}x")
-    for v in (5.0, 20.0, 100.0, 400.0):
-        i = int(np.argmin(np.abs(VELOCITIES - v)))
-        print(f"  {VELOCITIES[i]:6.1f} mm/s: blood {mid[i]:.3f} = {mid[i] / fat_u:4.2f}x fat, {mid[i] / derm:4.2f}x dermis")
+    i_lo, i_hi = (int(np.argmin(np.abs(VELOCITIES - v))) for v in (v_lo, v_hi))
+    print(f"Target velocity, 5-95 % of draws: {v_lo:.0f}-{v_hi:.0f} mm/s")
+    print(f"Levels: stagnant blood {stat:.3f} | dermis {derm:.3f} | fat {fat_u:.3f} | suppressed fat {fat_s:.3f}")
+    print(f"Stagnant blood already beats dermis {stat / derm:.2f}x and suppressed fat {stat / fat_s:.1f}x, "
+          f"but unsuppressed fat only {stat / fat_u:.2f}x")
+    print(f"Inflow enhancement over stagnant: {mid[i_lo] / stat:.2f}x at {v_lo:.0f} mm/s, "
+          f"{mid[i_hi] / stat:.2f}x at {v_hi:.0f} mm/s")
+    print(f"Inversion vs unsuppressed fat: {len(xs)}/{N_DRAWS} draws invert, at {x50:.0f} mm/s "
+          f"[{x5:.0f}-{x95:.0f}] (transit {SLAB_MM / x50:.2f} s); {frac:.0%} of joint draws sit below it")
+    print(f"Against suppressed fat the median never inverts: minimum {np.min(mid) / fat_s:.1f}x")
 
     save(fig, "fig1b_regime", n=N_DRAWS, seed=SEED,
          note=f"Simulation only; literature tissue parameters, no measured data. "

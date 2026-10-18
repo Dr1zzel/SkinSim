@@ -1,0 +1,128 @@
+# SkinSim
+
+A Bloch simulation toolbox for **time-of-flight MR angiography of cutaneous
+vessels at 3 T**: can a spoiled-GRE TOF acquisition see subcutaneous vessels of
+100–500 µm lying 1–10 mm below the skin surface, and with what protocol?
+
+Built for the [SKIN-COILS](https://anr.fr) project (ANR/FWF), Medical
+University of Vienna and Université Paris-Saclay.
+
+---
+
+## The model in one paragraph
+
+Under ideal spoiling the only magnetisation that survives from one TR to the
+next is the longitudinal component `Mz`, and every event acting on it —
+relaxation, an excitation, a saturation pulse — is an **affine map**
+`Mz → A·Mz + B`. Composing the events of one TR gives a single map. Static
+tissue sits at that map's fixed point `B/(1−A)`; blood that has received `n`
+excitations is the map applied `n` times, available in closed form. Spins are
+followed **along the vessel** rather than within a fixed voxel, because inflow
+and outflow are exactly what an EPG description cannot express. Flow is laminar,
+resolved into annular shells, so near-wall blood saturates differently from the
+centreline.
+
+The whole engine is `affine.py` — 58 lines, no MR-specific code in it.
+
+## Install and run
+
+Requires Python 3.11+, NumPy, SciPy and Matplotlib.
+
+```bash
+pip install numpy scipy matplotlib pytest
+make test          # 125 tests
+make figures       # regenerate every figure into figures/
+make check         # tests, then verify the committed figures match the code
+```
+
+To understand the pipeline, run the trace — it re-derives one figure stage by
+stage and prints every intermediate:
+
+```bash
+python figures/trace_fig1b.py --draw 0 --velocity 20
+```
+
+and read [docs/figure1b-walkthrough.md](docs/figure1b-walkthrough.md) beside it.
+
+## What the modules do
+
+| module | contents |
+|---|---|
+| `affine.py` | the engine: affine maps on `Mz`, composition, powers, fixed points |
+| `tissues.py` | every parameter as an interval with a confidence rating and a source, plus the Latin-hypercube sampler |
+| `sequences/tof.py` | TOF signal: inflow, laminar shells, TONE, saturation band |
+| `sequences/prep.py` | non-selective saturation pulses (fat saturation, MTC) |
+| `sequences/base.py` | the sequence interface, readout timing, flow geometry |
+| `skin.py` | layer depths, vessel geometry, laminar shell velocities |
+| `acquisition.py` | excitation slab, vessel path through it, coverage cost |
+| `protocols.py` | TR and TE assembled from named timing components |
+| `detectability.py` | partial volume, apparent width, SNR required to detect |
+| `noise.py` | non-central chi statistics for sum-of-squares channel combination |
+| `analysis.py` | CNR per √(scan time) |
+
+One test file per module, 125 tests, run by `make test`.
+
+## Figures
+
+Scripts that produce figures for the abstract:
+
+| script | figure |
+|---|---|
+| `figures/fig1b_regime.py` | **Figure 1b** — inflow against the backgrounds it competes with |
+| `figures/fig5_detectability.py` | **Figure 5** (simulation panel) — detection threshold and apparent width |
+
+Supporting figures, not in the abstract:
+
+| script | shows |
+|---|---|
+| `figures/fig_tradeoffs.py` | the transit-time threshold, and detect-versus-measure |
+| `figures/fig_tr_flip_ridge.py` | TR and flip angle as one knob along an iso-T_sat ridge |
+| `figures/fig_contrast_vs_flip.py` | contrast against flip angle |
+| `figures/fig_through_slab.py` | signal across the slab |
+| `figures/fig_detectability.py` | detectability at the measured operating point |
+
+Every figure records its Latin-hypercube seed and draw count in its own footer,
+so any panel can be regenerated exactly.
+
+## The constraint that matters
+
+**No prediction is fitted to the in vivo data.** The argument the abstract makes
+is *simulation predicts → images are consistent with it*, which is worth nothing
+if the model was tuned on the images.
+
+- **Allowed as input:** acquisition settings — TR, TE, flip angle, bandwidth,
+  voxel size, slab thickness and orientation, TONE percentage, scan time,
+  channel count, acceleration factor. These are protocol parameters, not
+  observations.
+- **Not allowed:** any measured signal, SNR, noise level, contrast ratio, vessel
+  calibre, apparent width or background texture from this project's sessions.
+
+Tissue parameters come from the literature with confidence ratings and sources.
+Where a quantity cannot be set without a measurement it gets a wide interval and
+says so, rather than quietly adopting a measured value. Every prediction is
+reproducible by someone who has never seen the images.
+
+## Honesty about the parameters
+
+`tissues.py` marks each source `[checked]` when it has been read at the
+publisher and `[unchecked]` when it is a lead that has not been consulted.
+
+```python
+from tissues import low_confidence_report, unchecked_sources
+print(low_confidence_report())   # every LOW and VERY_LOW parameter, with its source
+print(unchecked_sources())       # sources not yet read at the publisher
+```
+
+29 of 44 parameters are currently LOW or VERY_LOW. Epidermis is entirely
+unmeasured at 3 T; dermis `fatsat_s` and `mtc_s` rest on physical arguments
+rather than measurements. This is deliberate — the uncertainty analysis is the
+point, not a robustness appendix — but it should be read before any number here
+is quoted.
+
+## Further reading
+
+- [CLAUDE.md](CLAUDE.md) — design decisions that still hold
+- [docs/figure1b-walkthrough.md](docs/figure1b-walkthrough.md) — one figure
+  traced through the whole pipeline
+- [docs/history.md](docs/history.md) — superseded decisions and corrections
+- [QUESTIONS.md](QUESTIONS.md) — the questions the toolbox must answer

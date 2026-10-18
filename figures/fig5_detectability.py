@@ -67,5 +67,5 @@ print(f"fine     {FINE_A} mm, SNR {SNR_FINE:.1f} -> d_min {dmin(FINE_A, SNR_FINE
 print(f"sensitivity gain to make 0.15 mm match the achieved d_min: "
       f"x{need(FINE_A)[np.argmin(np.abs(D-dmin(ACHIEVED_A,SNR_MEASURED)))]/SNR_FINE:.1f}")
 fig.suptitle("Figure 5 — what sensitivity the next step requires", fontsize=12.5, color=INK)
-save(fig, "ABS_fig5_detect", note="Simulation (geometry and noise statistics) with the measured 15 October "
+save(fig, "fig5_detectability", note="Simulation (geometry and noise statistics) with the measured 15 October "
      "operating point overlaid; the finer voxel assumes matched scan time.")

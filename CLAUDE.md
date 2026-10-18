@@ -66,27 +66,13 @@ Any geometric cap or assumed timing is either derived from stated inputs or expo
 - Tests: pytest. No test, no merge.
 - Figure scripts read every parameter from `protocols.py` and `tissues.py`, never from literals.
 
-## Prior results — hypotheses, not facts
+## Where everything else is
 
-These come from the earlier codebase (SkinMRA) and were computed with placeholder tissue parameters. Reproduce or contradict them; never assume them.
-
-1. Inflow contrast fades along the vessel with visible length ≈ v·T_sat, with T_sat ≈ 0.81 s. (SkinSim's first TOF look, 7 October, found visible length ∝ v but with a T_sat that depends on threshold and background.)
-2. Tilting the slab away from the skin surface gains at most ~36 % and costs ~5× the number of slabs.
-
-## SkinMRA is archived
-
-The earlier codebase (`../SkinMRA`) is superseded and archived as of 14 October 2026. Ported from it: the Latin-hypercube/Sobol sampler (`tissues.collect_params`, `tissues.sample`, now returning `TissueSample` via `tissues.sample_tissues`); `signal_weighting` (PD · exp(−TE/T2*)); `cnr_efficiency` (`analysis.py`, against absolute CNR); the haemodynamic parameters, with the target-vessel velocity revised upward on anatomical grounds; and the literature validation of inflow enhancement (`tests/test_validation.py`). Deliberately not ported: the PyPulseq block-walking machinery.
-
-## Superseded decisions
-
-Recorded so they are not re-litigated by accident. Everything removed is recoverable from the tag `pre-tof-refactor`.
-
-- **Mechanism comparison as the purpose** (TOF vs PD vs T2-prep vs IR vs bSSFP), and the six questions that served it. Replaced on 14 October 2026, after the in vivo sessions of 8 and 13 October fixed the scope to the `fl3d1r` product sequence.
-- **Inversion recovery** (`sequences/ir.py`, IR tests): never acquired and will not be. Removed.
-- **bSSFP**: never built, never acquired. Dropped.
-- **FSD** (flow-sensitive dephasing): not reachable on the product sequence. The spatial position carried in `bloch.SpinState` stays but nothing plans to use it.
-- **MT as a two-pool model**: replaced by an empirical per-tissue saturation factor for MTC (`sequences/prep.py`), the honest level of detail for a quantity whose only planned measurement is one on/off comparison.
-- **The contrast ratio as the figure of merit**: replaced by absolute CNR per √(scan time).
-- **`figures/fig_tof_profile.py`**: replaced by `figures/fig_through_slab.py`.
-- **`predictions.py`**: predicted the 8 October protocol set, including IR and T2-prep arms that were never acquired. Removed. `PREDICTIONS.md` is kept unchanged as the timestamped record it produced.
-- **Prior results on mechanism ranking** from SkinMRA — the T2-prep/TOF velocity sensitivity and crossover, the blood/dermis vs blood/fat T2 and T1 ratios, bSSFP fat brightness, and the saturated blood/dermis ratio — answered questions that are no longer asked.
+- [README.md](README.md) — what the toolbox is, how to run it, which script
+  makes which figure.
+- [docs/figure1b-walkthrough.md](docs/figure1b-walkthrough.md) — the whole
+  pipeline traced for one figure, with a runnable companion script.
+- [docs/history.md](docs/history.md) — superseded decisions, archived results
+  and corrections. Nothing there describes the current toolbox.
+- [QUESTIONS.md](QUESTIONS.md) — the questions the toolbox must answer.
+- [PREDICTIONS.md](PREDICTIONS.md) — a timestamped record, kept unchanged.

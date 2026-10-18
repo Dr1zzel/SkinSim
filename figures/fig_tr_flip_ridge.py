@@ -135,7 +135,7 @@ def main() -> None:
 
     fig.suptitle("TR and flip angle are one setting: every pair on the ridge gives the same contrast",
                  fontsize=11, color=INK)
-    save(fig, "fig_general_3_tr_flip",
+    save(fig, "fig_tr_flip_ridge",
          note="Nominal literature parameters, no measured data and no parameter draw: "
               "this figure shows the structure of the design space, not its uncertainty.")
 

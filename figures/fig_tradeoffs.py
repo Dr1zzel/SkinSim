@@ -161,7 +161,7 @@ def main() -> None:
     panel_b(axes[1])
     fig.suptitle("What decides whether a cutaneous vessel is seen, and whether its width can be believed",
                  fontsize=11, color=INK)
-    save(fig, "fig_general_2_tradeoffs", n=N_DRAWS_HERE,
+    save(fig, "fig_tradeoffs", n=N_DRAWS_HERE,
          note=f"Literature parameters only, no measured data. Panel a: LHS seed 20261014, {N_DRAWS_HERE} draws, "
               "band 5-95 %. Panel b: geometry and noise statistics alone.")
 

@@ -72,4 +72,5 @@ def test_nominal_method_and_signal_weighting():
     assert tissues["dermis"].t2star_ms[0] == DERMIS.t2star_ms.nominal
     nominal = TissueSample.nominal(DERMIS)
     assert signal_weighting(nominal, 0.0) == pytest.approx(1.0)
-    assert signal_weighting(nominal, 15.0) == pytest.approx(np.exp(-1.0))
+    # one T2* of decay, with the value read from the table rather than hard-coded
+    assert signal_weighting(nominal, DERMIS.t2star_ms.nominal) == pytest.approx(np.exp(-1.0))

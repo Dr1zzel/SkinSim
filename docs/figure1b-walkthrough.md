@@ -57,7 +57,7 @@ class Param:
 arterial_blood.t1_ms      1600 .. 1950   nominal 1650   medium
 arterial_blood.t2star_ms    45 .. 75     nominal 65     medium
 arterial_blood.pd_rel      1.1 .. 1.4    nominal 1.25   low
-dermis.t2star_ms             5 .. 20     nominal 15     VERY LOW
+dermis.t2star_ms             5 .. 20     nominal 12     LOW
 ```
 
 **`nominal` is never read by any figure.** It exists for debugging and for the
@@ -91,8 +91,8 @@ Draw 0 came out as:
 | | T1 (ms) | T2\* (ms) | PD | fatsat_s |
 |---|---|---|---|---|
 | blood | 1830.5 | 54.03 | 1.297 | 1.000 |
-| dermis | 1079.0 | 13.21 | 1.000 | 0.901 |
-| fat | 394.3 | 44.36 | 1.598 | 0.212 |
+| dermis | 1014.1 | 13.21 | 1.000 | 0.901 |
+| fat | 428.8 | 40.07 | 1.598 | 0.212 |
 
 **Why "jointly" matters.** One Latin hypercube covers all 20 parameters at once,
 so draw 0 is a single coherent world — that blood sits beside *its own* dermis
@@ -312,10 +312,10 @@ point of relaxation alone is exactly **1.000** — fully relaxed.
 > |---|---|---|
 > | none | — | **1.000** |
 > | fat saturation | `fatsat_s = 1.000` | **1.000** (blood is on-resonance, untouched) |
-> | MTC | `mtc_s = 0.975` | **0.425** |
+> | MTC | `mtc_s = 0.960` | **0.314** |
 >
-> A 2.5 % loss per TR against only 1.9 % T1 recovery per TR compounds to a
-> steady state of 0.43. **Blood arrives at the slab already 57 % saturated,
+> A 4.0 % loss per TR against only 1.9 % T1 recovery per TR compounds to a
+> steady state of 0.31. **Blood arrives at the slab already 69 % saturated,
 > before a single excitation.** A non-selective MT pulse saturates blood
 > everywhere in the body, including upstream, so it trades background
 > suppression against the very inflow TOF depends on.

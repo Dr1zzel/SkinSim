@@ -434,6 +434,94 @@ is known.
 | **MTC as a per-pulse scalar** | `prep.py` docstring | Real MT builds up in the bound pool and transfers continuously. `mtc_s` is an effective number, not a pulse property. |
 | **No noise, no voxel** | — | This figure is *signal*, not CNR. A 6× ratio over near-zero suppressed fat says nothing about clearing the noise floor. Detectability is a separate calculation (`detectability.py`, `noise.py`). |
 
+---
+
+## 8b · Is the laminar flow model physiologically right?
+
+### The fluid mechanics is not in doubt
+
+Three dimensionless numbers decide whether Poiseuille applies, and all three
+clear their thresholds by orders of magnitude:
+
+| d (µm) | v (mm/s) | Reynolds | entrance length | Womersley α |
+|---|---|---|---|---|
+| 100 | 5 | 0.15 | 0.9 µm | 0.076 |
+| 300 | 15 | 1.4 | 25 µm | 0.227 |
+| 500 | 24 | 3.6 | 109 µm | 0.378 |
+| 1930 (perforator) | 89 | 52 | 6.0 mm | 1.458 |
+
+- **Turbulence needs Re > ~2000.** We are at Re ~1. Not close.
+- **Entrance length** is how far the parabola needs to re-develop after a
+  branch or bend. At 25 µm it is negligible against a 12 mm path, so the
+  profile is fully developed essentially everywhere.
+- **Womersley α < 3** means quasi-steady: the profile is parabolic at every
+  instant of the cardiac cycle, just scaled up and down.
+
+### The two real departures, and their measured size
+
+**Blunting from the cell-free layer.** Red cells migrate centrally, leaving a
+1–5 µm plasma layer at the wall ([Fedosov 2010](https://doi.org/10.1111/j.1549-8719.2010.00056.x)),
+which blunts the profile. The effect is significant below ~300 µm
+([Stergiou 2019](https://doi.org/10.3390/fluids4030143)) and at 100–500 µm the
+layer is only a few percent of the diameter. Tested on the real pipeline with
+`v = v_max(1 - (r/R)^k)`, all normalised to the same mean velocity:
+
+| k | profile | wall shell / mean | blood @ 15 mm/s | vs Poiseuille |
+|---|---|---|---|---|
+| 2 | Poiseuille | 0.234 | 0.2226 | 1.00× |
+| 4 | blunted | 0.324 | 0.2276 | 1.02× |
+| 9 | very blunt | 0.492 | 0.2318 | 1.04× |
+| ∞ | **plug flow** | 1.000 | 0.2357 | **1.06×** |
+
+Even the most extreme possible case — full plug flow — moves the slab-mean
+signal by 6 % and the inversion velocity from 16.5 to 14.2 mm/s. Realistic
+blunting moves it by 2 %.
+
+**Pulsatility.** A multi-minute scan samples every cardiac phase, so the image
+signal is the *time average* of the signal, not the signal at the mean velocity.
+The signal-versus-velocity curve is concave, so by Jensen's inequality those
+differ. With RI = 0.71 from the perforator data:
+
+| mean velocity | signal at mean | time-averaged | difference |
+|---|---|---|---|
+| 5 mm/s | 0.1543 | 0.1519 | −1.5 % |
+| 15 mm/s | 0.2226 | 0.2137 | −4.0 % |
+| 40 mm/s | 0.2921 | 0.2815 | −3.6 % |
+
+A few percent, and in the *opposite* direction to blunting, so the two largely
+cancel.
+
+### What actually drives the result is the geometry, not the profile
+
+The same test on vessel angle, which sets the path length through the slab:
+
+| azimuth | path (mm) | blood @ 15 mm/s | vs end-on | inversion velocity |
+|---|---|---|---|---|
+| 0° (end-on) | 12.0 | 0.2226 | 1.00× | **16.5 mm/s** |
+| 45° | 17.0 | 0.1991 | 0.89× | 23.3 mm/s |
+| 70° | 35.1 | 0.1553 | 0.70× | **48.2 mm/s** |
+
+**The inversion velocity nearly triples with angle, while it barely moves with
+profile shape.** At 70° the inversion sits above the entire target velocity
+range, so every target vessel would be darker than unsuppressed fat.
+
+So the assumption to interrogate is not Poiseuille. It is that a vessel is a
+**single straight constant-calibre segment at one angle**. Real cutaneous
+vessels are tortuous and branch — in the dermal plexus, at intervals well under
+the 12 mm slab. Both tortuosity and branching lengthen the effective path and
+slow the blood, which deepens the inversion. The figure's end-on geometry is
+the most favourable case.
+
+### One caveat on what this does and does not license
+
+CLAUDE.md (Decision 6) argues laminar flow is "a real finding, not a
+refinement" because plug flow overestimates TOF signal and makes vessels appear
+narrower. The 6 % above tests only the first half, for the **slab-mean signal**
+on this figure. The apparent-width claim is a different quantity — near-wall
+blood being dark makes the vessel's bright core narrower than the lumen — and it
+is not tested here. Laminar shells may well matter more for `detectability.py`
+than they do for Figure 1b. Do not carry the 6 % across.
+
 ## 9 · How to check it yourself
 
 ```bash

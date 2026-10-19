@@ -23,12 +23,10 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, replace
 
-from acquisition import SatBand, Slab
+from geometry import SatBand, Slab
+from sequence import ReadoutTiming, SaturationModule, TofSequence
 from numpy.typing import ArrayLike
 
-from sequences.base import ReadoutTiming
-from sequences.prep import SaturationModule
-from sequences.tof import TofSequence
 
 GAMMA_HZ_PER_MT = 42577.48  # 1H gyromagnetic ratio / 2 pi
 

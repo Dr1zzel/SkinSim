@@ -24,14 +24,14 @@ Everything is acquired with `fl3d1r`. No `.seq` file runs on the scanner for thi
 - **TOF** is the subject. Its signal model is a spoiled GRE with inflow, laminar shells, TONE, and non-selective saturation pulses (fat saturation, MTC) applied every TR.
 - **T2-prep** is retained as a *comparison calculation*, not an arm to be acquired: it gives a defensible number for what a flow-independent alternative would deliver at these tissue parameters and what it would cost in scan time.
 
-Out of scope: k-space encoding and image synthesis. The point-spread function enters only as a stated width (`detectability.apparent_fwhm`).
+Out of scope: k-space encoding and image synthesis. The point-spread function enters only as a stated width (`detect.apparent_fwhm`).
 
 ## The regime: sensitivity-limited, not contrast-limited
 
 With fat saturation on, the background at 1–10 mm depth is suppressed fat, close to the noise floor at these voxel sizes. A contrast *ratio* against a near-zero background is not a meaningful quantity.
 
 - **The metric is absolute CNR per √(scan time):** (S_blood − S_background) / σ, with σ set by voxel volume, scan time and g-factor. The ratio is never optimised.
-- **Noise is non-central chi with 2N degrees of freedom** for a sum-of-squares combination of N channels, not Rician (`noise.py`).
+- **Noise is non-central chi with 2N degrees of freedom** for a sum-of-squares combination of N channels, not Rician (`detect.py`).
 - **Detection uses the Rose criterion (CNR ≥ 4)** on the peak voxel, with partial volume, grid registration (`kappa`, derived by simulating sub-voxel offsets) and background texture that does not average down (`structure_fraction`).
 
 ## Backgrounds

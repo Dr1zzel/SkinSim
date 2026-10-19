@@ -1,17 +1,17 @@
+"""The TONE through-slab flip-angle ramp."""
+from __future__ import annotations
+
 import math
 from dataclasses import replace
 
 import numpy as np
 import pytest
 
-from acquisition import Slab
+from geometry import Slab, Vessel, laminar_velocities
+from sequence import FlowGeometry, as_sample_axis, flip_profile, mz_before_pulse, pulses_received
 from affine import compose, power, walk
 from protocols import MEASURED
-from sequences.base import FlowGeometry
-from sequences.tof import as_sample_axis, mz_before_pulse, pulses_received
-from skin import Vessel, laminar_velocities
 from tissues import ARTERIAL_BLOOD, DERMIS, TissueSample, signal_weighting
-from tone import flip_profile
 
 BLOOD, DERMIS_S = TissueSample.nominal(ARTERIAL_BLOOD), TissueSample.nominal(DERMIS)
 MEASURED_SEQ = MEASURED["13oct_0.35mm"].sequence()  # TONE 70 %, fat sat, band

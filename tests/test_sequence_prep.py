@@ -1,23 +1,19 @@
+"""Saturation pulses within each TR: fat saturation, MTC and the travelling band."""
+from __future__ import annotations
+
 import math
 
 import numpy as np
 import pytest
 
-from acquisition import SatBand, Slab
 from affine import compose, fixed_point
-from bloch import ernst_signal
+from geometry import SatBand, Slab, Vessel
 from protocols import CANDIDATES, MEASURED
-from sequences.base import FlowGeometry, ReadoutTiming
-from sequences.prep import (
-    SaturationModule,
-    SaturationPulse,
-    band_exit_mz,
-    between_excitations,
-    excitation_map,
-    mean_recovery_map,
+from reference import ernst_signal
+from sequence import (
+    FlowGeometry, ReadoutTiming, SaturationModule, SaturationPulse, TofSequence,
+    band_exit_mz, between_excitations, excitation_map, mean_recovery_map,
 )
-from sequences.tof import TofSequence
-from skin import Vessel
 from tissues import ARTERIAL_BLOOD, DERMIS, HYPODERMIS, TissueSample
 
 TR_MS, FLIP_DEG = 45.22, 18.0

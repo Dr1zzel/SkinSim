@@ -16,13 +16,10 @@ import argparse
 import numpy as np
 from common import N_SHELLS, SEED  # same draw as the figure
 
-from acquisition import Slab
+from geometry import Slab, Vessel, laminar_velocities
+from sequence import FlowGeometry, SaturationModule, TofSequence, between_excitations, excitation_map, pulses_received, saturation_map
 from affine import apply, compose, fixed_point, power, relax_map
 from protocols import BANDWIDTH_PER_PX_HZ, PARTITION_MM, PRISMA_XR, RF_DURATION_MS, fl3d1r_timing
-from sequences.base import FlowGeometry
-from sequences.prep import SaturationModule, between_excitations, excitation_map, saturation_map
-from sequences.tof import TofSequence, pulses_received
-from skin import Vessel, laminar_velocities
 from tissues import PARAM_FIELDS, TISSUES, TissueSample, sample_tissues, signal_weighting
 
 TR_MS, FLIP_DEG, SLAB_MM, INPLANE_MM = 35.0, 20.0, 12.0, 0.3

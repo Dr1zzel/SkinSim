@@ -30,16 +30,13 @@ excitations each parcel of blood has seen.
 figures/fig1b_regime.py          the figure: draws, loops velocities, plots
 ├── tissues.py                   parameter intervals, the sampler, PD/T2* weighting
 ├── protocols.py                 TR and TE built from named timing components
-├── skin.py                      Vessel, layer depths, laminar shell velocities
-├── acquisition.py               Slab, path length through it, entry side
-└── sequences/
-    ├── base.py                  Sequence.echo, FlowGeometry, ReadoutTiming
-    ├── prep.py                  saturation pulses, between_excitations
-    └── tof.py                   TofSequence: static_signal, blood_signal
-        └── affine.py            compose / power / fixed_point / apply
+├── geometry.py                  Vessel, layer depths, laminar shells, Slab, path length
+└── sequence.py                  ReadoutTiming, Sequence.echo, FlowGeometry,
+    │                            saturation pulses, TONE, TofSequence
+    └── affine.py                compose / power / fixed_point / apply
 ```
 
-`affine.py` is the engine. It is 60 lines and contains no MR-specific code at all.
+`affine.py` is the engine. It is 58 lines and contains no MR-specific code at all.
 
 ---
 
@@ -227,7 +224,7 @@ it is read out.
 
 ---
 
-## 5 · Geometry (`skin.py`, `acquisition.py`)
+## 5 · Geometry (`geometry.py`)
 
 ```python
 slab   = Slab(thickness_mm=12.0, orientation_deg=90.0)   # normal = [1, 0, 0]
@@ -278,7 +275,7 @@ models overestimate TOF signal, and it is a stated design decision in CLAUDE.md.
 
 ---
 
-## 6 · Assembling the blood signal (`sequences/tof.py`)
+## 6 · Assembling the blood signal (`sequence.py`)
 
 ### How many excitations
 
@@ -425,14 +422,14 @@ is known.
 
 | Assumption | Where | Direction of error |
 |---|---|---|
-| **Ideal rectangular slab profile** | `tof.py` docstring | Real RF gives reduced flip at the slab edges, so real blood is *less* saturated near the faces. Figure is pessimistic. |
+| **Ideal rectangular slab profile** | `sequence.py` docstring | Real RF gives reduced flip at the slab edges, so real blood is *less* saturated near the faces. Figure is pessimistic. |
 | **Ideal spoiling** | the whole affine treatment | Residual transverse magnetisation would add coherent pathways not modelled at all. |
 | **`n = floor(...)` quantisation** | `pulses_received` | Unbiased in the mean; a step function per shell. |
 | **Slab-mean along the path** | `blood_at` | Mixes fresh and saturated blood. A MIP weights the entry end more, so the figure is pessimistic. |
 | **End-on crossing** | the chosen geometry | The best case for inflow. Any other angle deepens the inversion. Figure is conservative. |
 | **Velocity ⊥ diameter** | the LHS samples them independently although v ∝ d | Breaks a real correlation; understates how bad small vessels are, since they are both slower and more partial-volumed. Conservative. |
-| **MTC as a per-pulse scalar** | `prep.py` docstring | Real MT builds up in the bound pool and transfers continuously. `mtc_s` is an effective number, not a pulse property. |
-| **No noise, no voxel** | — | This figure is *signal*, not CNR. A 6× ratio over near-zero suppressed fat says nothing about clearing the noise floor. Detectability is a separate calculation (`detectability.py`, `noise.py`). |
+| **MTC as a per-pulse scalar** | `sequence.py` docstring | Real MT builds up in the bound pool and transfers continuously. `mtc_s` is an effective number, not a pulse property. |
+| **No noise, no voxel** | — | This figure is *signal*, not CNR. A 6× ratio over near-zero suppressed fat says nothing about clearing the noise floor. Detectability is a separate calculation (`detect.py`). |
 
 ---
 
@@ -519,7 +516,7 @@ refinement" because plug flow overestimates TOF signal and makes vessels appear
 narrower. The 6 % above tests only the first half, for the **slab-mean signal**
 on this figure. The apparent-width claim is a different quantity — near-wall
 blood being dark makes the vessel's bright core narrower than the lumen — and it
-is not tested here. Laminar shells may well matter more for `detectability.py`
+is not tested here. Laminar shells may well matter more for `detect.py`
 than they do for Figure 1b. Do not carry the 6 % across.
 
 ## 9 · How to check it yourself

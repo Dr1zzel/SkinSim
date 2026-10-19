@@ -1,25 +1,27 @@
-"""Detectability: what SNR a vessel of diameter d needs at voxel size a, and what width it appears to have.
+"""From signal to detection: channel noise statistics, CNR efficiency, and what a vessel needs to be seen.
 
-Physics only, no measured numbers (CLAUDE.md). Definitions:
+Three layers, none of which contains a measured number:
 
-- S_ref is a chosen reference signal and SNR = S_ref / sigma. contrast is
-  (S_vessel - S_background) / S_ref. With S_ref = the background, SNR is the
-  background SNR of QUESTIONS.md Q1; against a suppressed background, whose
-  SNR tends to zero, pass S_ref = the blood signal so the answer stays finite.
-- structure_fraction is background texture, a standard deviation as a
-  fraction of S_ref that does not average down with thermal noise.
-- The peak voxel holds a blood fraction f = kappa * f_max, with f_max the
-  area-ratio maximum min(1, (pi d^2 / 4) / voxel area) and kappa the
+- NOISE. A sum-of-squares combination of N channels gives magnitudes
+  distributed as a non-central chi with 2N degrees of freedom, not Rician
+  (which is the N = 1 case). Its second moment is exact and simple,
+  E[M^2] = A^2 + 2 N sigma^2, which is what true_signal inverts.
+- EFFICIENCY. Absolute contrast per square root of the time spent per k-space
+  line. Never a ratio: in the sensitivity-limited regime the background can be
+  near zero, where a ratio is meaningless.
+- DETECTABILITY. What SNR a vessel of diameter d needs at voxel size a, and
+  what width it appears to have. The peak voxel holds a blood fraction
+  f = kappa * f_max, with f_max the area-ratio maximum and kappa the
   grid-registration factor, DERIVED by averaging the exact peak-voxel fraction
-  over uniformly random sub-voxel offsets of the vessel (derive_kappa). It
-  depends on d / a; it is never asserted.
-- CNR of the peak voxel = f |contrast| SNR / sqrt(1 + (structure_fraction SNR)^2),
-  and detection needs CNR >= the Rose threshold.
+  over uniformly random sub-voxel offsets. CNR of the peak voxel is
+  f |contrast| SNR / sqrt(1 + (structure_fraction SNR)^2), and detection needs
+  CNR >= the Rose threshold.
 
-Geometry: the vessel is a straight cylinder; voxel_mm is the voxel's extent in
-the plane perpendicular to it (a scalar for a square cross-section, or a pair).
-The PSF enters only apparent_fwhm, not the blood fraction.
-Units: mm.
+The vessel is a straight cylinder; voxel_mm is its extent in the plane
+perpendicular to it. The point-spread function enters only apparent_fwhm,
+never the blood fraction.
+
+Units: mm, ms.
 """
 from __future__ import annotations
 
@@ -28,6 +30,48 @@ from functools import lru_cache
 
 import numpy as np
 from numpy.typing import ArrayLike
+
+
+def noise_floor_mean(n_channels: int) -> float:
+    """Return E[chi_2N] / sigma, the mean magnitude of a signal-free region, sqrt(2) Gamma(N + 1/2) / Gamma(N)."""
+    if n_channels < 1:
+        raise ValueError("need at least one channel")
+    return math.sqrt(2.0) * math.exp(math.lgamma(n_channels + 0.5) - math.lgamma(n_channels))
+
+
+def true_signal(measured: ArrayLike, sigma: ArrayLike, n_channels: int = 4) -> np.ndarray:
+    """Return sqrt(max(M^2 - 2 N sigma^2, 0)), exact when M is the root-mean-square magnitude of a uniform region."""
+    m = np.asarray(measured, dtype=float)
+    return np.sqrt(np.maximum(m**2 - 2 * n_channels * np.asarray(sigma, dtype=float) ** 2, 0.0))
+
+
+def sigma_from_background(mean_signal_free: float, n_channels: int = 4) -> float:
+    """Return the per-channel noise sigma from the mean magnitude of a signal-free region."""
+    return mean_signal_free / noise_floor_mean(n_channels)
+
+
+def thermal_snr(voxel_volume_mm3: ArrayLike, scan_time_s: ArrayLike, g_factor: ArrayLike = 1.0) -> np.ndarray:
+    """Return relative thermal SNR, V sqrt(T) / g, for the actual (accelerated) scan time T."""
+    # Relative: one sensitivity constant, set by coil, depth and sample and not
+    # derivable here, multiplies every protocol alike. Acceleration enters through
+    # the shorter T and through g; a separate R factor would count it twice.
+    return np.asarray(voxel_volume_mm3, dtype=float) * np.sqrt(np.asarray(scan_time_s, dtype=float)) / g_factor
+
+
+# --- Efficiency: absolute contrast per sqrt(time per k-space line) ---
+
+
+def cnr_efficiency(s_blood: ArrayLike, s_background: ArrayLike, time_per_line_ms: ArrayLike) -> np.ndarray:
+    """Return (S_blood - S_background) / sqrt(time per k-space line) per sqrt(s), broadcasting, refusing non-positive times."""
+    t = np.asarray(time_per_line_ms, dtype=float)
+    if np.any(t <= 0):
+        raise ValueError("time per k-space line must be positive")
+    diff = np.asarray(s_blood, dtype=float) - np.asarray(s_background, dtype=float)
+    return diff / np.sqrt(t / 1000.0)
+
+
+# --- Detectability: blood fraction, required SNR and apparent width ---
+
 
 ROSE = 4.0  # CNR threshold for reliable visual detection (Rose, 1948)
 KAPPA_SEED, KAPPA_OFFSETS = 20261014, 4096  # recorded: the derivation of kappa is deterministic

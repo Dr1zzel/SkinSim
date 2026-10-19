@@ -18,10 +18,9 @@ import numpy as np  # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from acquisition import Slab  # noqa: E402
+from geometry import Slab, Vessel
+from sequence import FlowGeometry
 from protocols import Protocol  # noqa: E402
-from sequences.base import FlowGeometry  # noqa: E402
-from skin import Vessel  # noqa: E402
 from tissues import HAEMODYNAMICS, PARAM_FIELDS, TissueSample, sample_tissues  # noqa: E402
 
 SEED, N_DRAWS = 20261014, 128

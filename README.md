@@ -50,17 +50,12 @@ and read [docs/figure1b-walkthrough.md](docs/figure1b-walkthrough.md) beside it.
 |---|---|
 | `affine.py` | the engine: affine maps on `Mz`, composition, powers, fixed points |
 | `tissues.py` | every parameter as an interval with a confidence rating and a source, plus the Latin-hypercube sampler |
-| `sequences/tof.py` | TOF signal: inflow, laminar shells, TONE, saturation band |
-| `sequences/prep.py` | non-selective saturation pulses (fat saturation, MTC) |
-| `sequences/base.py` | the sequence interface, readout timing, flow geometry |
-| `skin.py` | layer depths, vessel geometry, laminar shell velocities |
-| `acquisition.py` | excitation slab, vessel path through it, coverage cost |
+| `sequence.py` | readout timing, saturation pulses, TONE, and the TOF signal model |
+| `geometry.py` | skin layers, vessel geometry, laminar shells, the slab and the path through it |
 | `protocols.py` | TR and TE assembled from named timing components |
-| `detectability.py` | partial volume, apparent width, SNR required to detect |
-| `noise.py` | non-central chi statistics for sum-of-squares channel combination |
-| `analysis.py` | CNR per √(scan time) |
+| `detect.py` | channel noise statistics, CNR per √(scan time), partial volume, apparent width, SNR required to detect |
 
-One test file per module, 125 tests, run by `make test`.
+Tests mirror the modules, 109 of them, run by `make test`. `tests/reference.py` holds independent closed-form implementations used to check the fast path; nothing in the toolbox imports it, which is what makes the comparison a real check.
 
 ## Figures
 
@@ -71,15 +66,6 @@ Scripts that produce figures for the abstract:
 | `figures/fig1b_regime.py` | **Figure 1b** — inflow against the backgrounds it competes with |
 | `figures/fig5_detectability.py` | **Figure 5** (simulation panel) — detection threshold and apparent width |
 
-Supporting figures, not in the abstract:
-
-| script | shows |
-|---|---|
-| `figures/fig_tradeoffs.py` | the transit-time threshold, and detect-versus-measure |
-| `figures/fig_tr_flip_ridge.py` | TR and flip angle as one knob along an iso-T_sat ridge |
-| `figures/fig_contrast_vs_flip.py` | contrast against flip angle |
-| `figures/fig_through_slab.py` | signal across the slab |
-| `figures/fig_detectability.py` | detectability at the measured operating point |
 
 Every figure records its Latin-hypercube seed and draw count in its own footer,
 so any panel can be regenerated exactly.

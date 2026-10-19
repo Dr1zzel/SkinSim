@@ -9,7 +9,7 @@
 from __future__ import annotations
 import numpy as np
 from common import INK, INK_2, SERIES, plt, save, style
-from detectability import ROSE, apparent_fwhm, blood_fraction
+from detect import ROSE, apparent_fwhm, blood_fraction
 
 D = np.geomspace(0.08, 1.5, 200)
 ACHIEVED_A, FINE_A, PART = 0.245, 0.15, 0.22

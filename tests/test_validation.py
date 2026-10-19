@@ -3,18 +3,16 @@
 These check the signal model against textbook physics and a published
 operating point. They are not fits to this project's data, and they are what
 makes a simulation-only prediction credible to a reviewer. The Ernst steady
-state is checked in test_bloch.py.
+state is checked against tests/reference.py.
 """
 import math
 
 import numpy as np
 import pytest
 
-from acquisition import Slab
-from bloch import ernst_signal, spoiled_train
-from sequences.base import FlowGeometry, ReadoutTiming
-from sequences.tof import TofSequence
-from skin import Vessel
+from geometry import Slab, Vessel
+from sequence import FlowGeometry, ReadoutTiming, TofSequence
+from reference import ernst_signal, spoiled_train
 from tissues import TissueSample
 
 

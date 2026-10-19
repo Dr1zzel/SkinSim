@@ -1,13 +1,14 @@
+"""The TOF signal model: inflow, laminar shells and the static limit."""
+from __future__ import annotations
+
 import math
 
 import numpy as np
 import pytest
 
-from acquisition import Slab
-from bloch import spoiled_train
-from sequences.base import FlowGeometry, Preparation, ReadoutTiming, TissueSample
-from sequences.tof import TofSequence, mz_before_pulse
-from skin import Vessel
+from geometry import Slab, Vessel
+from sequence import FlowGeometry, Preparation, ReadoutTiming, TissueSample, TofSequence, mz_before_pulse
+from reference import spoiled_train
 from tissues import ARTERIAL_BLOOD, DERMIS, HYPODERMIS
 
 TIMING = ReadoutTiming(

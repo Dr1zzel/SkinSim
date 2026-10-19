@@ -33,12 +33,9 @@ from __future__ import annotations
 import numpy as np
 from common import GRID, INK, INK_2, N_SHELLS, SERIES, plt, save
 
-from acquisition import Slab
+from geometry import Slab, Vessel
+from sequence import FlowGeometry, SaturationModule, TissueSample, TofSequence
 from protocols import BANDWIDTH_PER_PX_HZ, PARTITION_MM, PRISMA_XR, RF_DURATION_MS, fl3d1r_timing
-from sequences.base import FlowGeometry, TissueSample
-from sequences.prep import SaturationModule
-from sequences.tof import TofSequence
-from skin import Vessel
 from tissues import HAEMODYNAMICS, PARAM_FIELDS, sample_tissues
 
 # Validated two-hue pair (dataviz validator, light surface): blood vs fat.

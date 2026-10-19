@@ -92,7 +92,7 @@ def show_geometry() -> FlowGeometry:
 
 def show_shells(velocity: float) -> tuple[np.ndarray, np.ndarray]:
     """Print the laminar shells and return velocities and weights."""
-    head(f"STEP 5  skin.py: the lumen is {N_SHELLS} shells, not a plug")
+    head(f"STEP 5  geometry.py: the lumen is {N_SHELLS} shells, not a plug")
     vel, w = laminar_velocities(velocity, N_SHELLS)
     print(f"  {'shell':>6}{'v (mm/s)':>12}{'area weight':>14}")
     for i, (v, wi) in enumerate(zip(vel, w)):
@@ -125,7 +125,7 @@ def show_affine(blood: TissueSample, timing) -> tuple:
 
 def show_saturation(fat: TissueSample, blood: TissueSample, timing) -> None:
     """Print how a saturation pulse enters the TR, and what it does to the inflow."""
-    head("STEP 7  prep.py: where a saturation pulse sits, and what it costs")
+    head("STEP 7  sequence.py: where a saturation pulse sits, and what it costs")
     delay = 8.0
     coded = between_excitations((SaturationModule("fatsat_s", delay).pulse(fat),), fat, timing.tr_ms)
     manual = compose(relax_map(timing.tr_ms - delay, fat.t1_ms),
@@ -151,7 +151,7 @@ def show_saturation(fat: TissueSample, blood: TissueSample, timing) -> None:
 def show_signal(blood: TissueSample, flow: FlowGeometry, timing, velocity: float,
                 vel: np.ndarray, m) -> None:
     """Print the pulse count, the echo conversion and the path mean."""
-    head("STEP 8  tof.py: excitations received, then Mz -> echo")
+    head("STEP 8  sequence.py: excitations received, then Mz -> echo")
     seq = TofSequence(timing=timing, flip_deg=FLIP_DEG)
     pos = np.linspace(0.0, flow.path_mm(), N_POSITIONS)
     n = pulses_received(pos[:, None], vel[None, :], timing.tr_ms)

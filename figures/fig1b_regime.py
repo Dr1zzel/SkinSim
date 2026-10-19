@@ -13,11 +13,11 @@ against drawn as flat references:
 
 Two things follow, and they are different claims:
 
-  - inflow still works: 1.4x at 3 mm/s to 3.4x at 70 mm/s over the stagnant
+  - inflow still works: 1.4x at 3 mm/s to 3.4x at 80 mm/s over the stagnant
     floor, so it is not exhausted at cutaneous velocities;
   - but it is not what makes the vessel visible. Stagnant blood already beats
     dermis and suppressed fat. Inflow is load-bearing only against UNSUPPRESSED
-    fat, where stagnant blood sits at 0.42x the background - and there it
+    fat, where stagnant blood sits at 0.45x the background - and there it
     fails, inverting in every parameter draw.
 
 Layout: the velocity regimes sit on a rail below the axes rather than as shaded

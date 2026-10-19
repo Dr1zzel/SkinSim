@@ -51,7 +51,7 @@ class Param:
 ```
 
 ```
-arterial_blood.t1_ms      1600 .. 1950   nominal 1650   medium
+arterial_blood.t1_ms      1600 .. 1950   nominal 1800   medium
 arterial_blood.t2star_ms    45 .. 75     nominal 65     medium
 arterial_blood.pd_rel      1.1 .. 1.4    nominal 1.25   low
 dermis.t2star_ms             4 .. 10     nominal  8     LOW
@@ -94,7 +94,7 @@ Draw 0 came out as:
 **Why "jointly" matters.** One Latin hypercube covers all 20 parameters at once,
 so draw 0 is a single coherent world — that blood sits beside *its own* dermis
 and *its own* fat. This is what licenses the paired statistics the figure quotes
-("brighter in 93 % of draws"). If each tissue were sampled separately, pairing
+("brighter in 100 % of draws"). If each tissue were sampled separately, pairing
 them would be meaningless.
 
 **Why Latin hypercube and not plain random.** LHS stratifies each parameter into
@@ -177,9 +177,9 @@ def fixed_point(m):                     # the steady state
 | n | A^n | Mz from inflow 1.0 |
 |---|---|---|
 | 0 | 1.000000 | 1.000000 (identity) |
-| 1 | 0.920246 | 0.940941 |
-| 5 | 0.659964 | 0.748196 |
-| **inf** | 0.000000 | **0.259480 = the fixed point exactly** |
+| 1 | 0.921900 | 0.940835 |
+| 5 | 0.666247 | 0.746914 |
+| **inf** | 0.000000 | **0.242484 = the fixed point exactly** |
 
 That last row is the elegant part: **static tissue is just `n = ∞`.** There is no
 separate code path for it. A vessel with velocity → 0 produces exactly
@@ -207,7 +207,7 @@ fixed point B/(1-A)  = 0.24248      <- stagnant blood's Mz/M0
 **Note the engine runs at unit M0.** `B = 1 - A`, not `PD·(1 - A)`. Proton
 density is applied later, at the echo step. This keeps the maps tissue-agnostic.
 
-### Saturation pulses and their order (`prep.py`)
+### Saturation pulses and their order (`sequence.py`)
 
 A fat-sat or MTC pulse sits `delay_ms` *before* each excitation, so one TR is:
 
@@ -217,7 +217,7 @@ excite(α) → relax(TR - delay) → saturate(s) → relax(delay) → [next exci
 
 `between_excitations` builds this by sorting pulses by delay and composing.
 Verified against the hand-written composition for fat at 8 ms:
-`compose(relax(27), saturate(0.259), relax(8))` matches to machine precision. ✓
+`compose(relax(27), saturate(0.212), relax(8))` matches to machine precision. ✓
 
 The 8 ms tail matters: tissue recovers for 8 ms *after* being saturated, before
 it is read out.
@@ -286,9 +286,11 @@ def pulses_received(positions_mm, velocity_mm_s, tr_ms):
     return np.where(step_mm > 0, n, np.inf)
 ```
 
-At 20 mm/s one TR advances 0.70 mm. A spin 8.7 TRs into the slab is treated as
-having had **8** pulses, never 8.7 — it is a step function per shell. With 8
-shells × 32 positions the steps average out in the mean.
+At a 20 mm/s *mean* one TR advances 0.70 mm; the centreline, at 2 × the mean,
+advances 1.389 mm and so reaches the 12 mm exit face having had only 8
+excitations, against 73 for the wall shell. A spin 8.7 TRs into the slab is
+treated as having had **8** pulses, never 8.7 — it is a step function per shell.
+With 8 shells × 32 positions the steps average out in the mean.
 
 Velocity 0 → `inf` → the fixed point. This is the mechanism by which static
 tissue needs no special case.
@@ -406,12 +408,12 @@ xs   = crossing_velocities(...)   # per draw, bisection in log velocity
 frac = mean(blood_at(s, v_s) < static(s))   # each draw at ITS OWN velocity
 ```
 
-- **`xs`**: for each draw, *at what velocity* would it invert → 16 mm/s [5–46].
-  Found by `scipy.optimize.brentq` on log velocity, **not** read off the
-  plotting grid — otherwise the quoted bounds move when the grid is refined
-  (this is what shifted an earlier "7–44" to "5–46").
+- **`xs`**: for each draw, *at what velocity* would it invert → 13 mm/s [5–35],
+  in 96 of 96 draws. Found by `scipy.optimize.brentq` on log velocity, **not**
+  read off the plotting grid — otherwise the quoted bounds move when the grid is
+  refined.
 - **`frac`**: pairing each draw's tissue parameters with *that same draw's*
-  velocity, how many are below the threshold → 57 %.
+  velocity, how many are below the threshold → 51 %.
 
 ---
 
@@ -463,27 +465,31 @@ which blunts the profile. The effect is significant below ~300 µm
 layer is only a few percent of the diameter. Tested on the real pipeline with
 `v = v_max(1 - (r/R)^k)`, all normalised to the same mean velocity:
 
-| k | profile | wall shell / mean | blood @ 15 mm/s | vs Poiseuille |
-|---|---|---|---|---|
-| 2 | Poiseuille | 0.234 | 0.2226 | 1.00× |
-| 4 | blunted | 0.324 | 0.2276 | 1.02× |
-| 9 | very blunt | 0.492 | 0.2318 | 1.04× |
-| ∞ | **plug flow** | 1.000 | 0.2357 | **1.06×** |
+| k | profile | wall shell / mean | blood @ 15 mm/s | vs Poiseuille | inversion |
+|---|---|---|---|---|---|
+| 2 | Poiseuille | 0.234 | 0.2242 | 1.00× | 12.7 mm/s |
+| 4 | blunted | 0.330 | 0.2295 | 1.02× | 12.0 mm/s |
+| 9 | very blunt | 0.519 | 0.2338 | 1.04× | 11.5 mm/s |
+| ∞ | **plug flow** | 1.000 | 0.2375 | **1.06×** | **11.1 mm/s** |
 
 Even the most extreme possible case — full plug flow — moves the slab-mean
-signal by 6 % and the inversion velocity from 16.5 to 14.2 mm/s. Realistic
-blunting moves it by 2 %.
+signal by 6 % and the median inversion velocity from 12.7 to 11.1 mm/s, a 13 %
+shift. Realistic blunting moves it by 2 % and 0.7 mm/s.
 
 **Pulsatility.** A multi-minute scan samples every cardiac phase, so the image
 signal is the *time average* of the signal, not the signal at the mean velocity.
 The signal-versus-velocity curve is concave, so by Jensen's inequality those
 differ. With RI = 0.71 from the perforator data:
 
+With a raised-cosine waveform anchored on the same perforator Doppler data
+(end-diastolic 0.29 × peak systolic from RI = 0.71, time-averaged mean
+0.53 × peak systolic, giving peak/mean = 1.9):
+
 | mean velocity | signal at mean | time-averaged | difference |
 |---|---|---|---|
-| 5 mm/s | 0.1543 | 0.1519 | −1.5 % |
-| 15 mm/s | 0.2226 | 0.2137 | −4.0 % |
-| 40 mm/s | 0.2921 | 0.2815 | −3.6 % |
+| 5 mm/s | 0.1548 | 0.1533 | −0.9 % |
+| 15 mm/s | 0.2251 | 0.2174 | −3.4 % |
+| 40 mm/s | 0.2956 | 0.2858 | −3.3 % |
 
 A few percent, and in the *opposite* direction to blunting, so the two largely
 cancel.
@@ -492,15 +498,16 @@ cancel.
 
 The same test on vessel angle, which sets the path length through the slab:
 
-| azimuth | path (mm) | blood @ 15 mm/s | vs end-on | inversion velocity |
-|---|---|---|---|---|
-| 0° (end-on) | 12.0 | 0.2226 | 1.00× | **16.5 mm/s** |
-| 45° | 17.0 | 0.1991 | 0.89× | 23.3 mm/s |
-| 70° | 35.1 | 0.1553 | 0.70× | **48.2 mm/s** |
+| azimuth | path (mm) | blood @ 15 mm/s | vs end-on | inversion velocity | draws dark |
+|---|---|---|---|---|---|
+| 0° (end-on) | 12.0 | 0.2242 | 1.00× | **12.7 mm/s** | 51 % |
+| 45° | 17.0 | 0.1998 | 0.89× | 17.9 mm/s | 62 % |
+| 70° | 35.1 | 0.1554 | 0.69× | **37.0 mm/s** | 84 % |
 
 **The inversion velocity nearly triples with angle, while it barely moves with
-profile shape.** At 70° the inversion sits above the entire target velocity
-range, so every target vessel would be darker than unsuppressed fat.
+profile shape.** At 70° it sits above the median drawn velocity of 15 mm/s by a
+factor of 2.5, so 84 % of joint draws are darker than unsuppressed fat, against
+51 % end-on.
 
 So the assumption to interrogate is not Poiseuille. It is that a vessel is a
 **single straight constant-calibre segment at one angle**. Real cutaneous
@@ -523,7 +530,7 @@ than they do for Figure 1b. Do not carry the 6 % across.
 
 ```bash
 python figures/trace_fig1b.py --draw 7 --velocity 12   # every intermediate
-python -m pytest tests/ -q                             # 125 tests
+python -m pytest tests/ -q                             # 109 tests
 python figures/fig1b_regime.py                         # regenerate, prints all stats
 ```
 
@@ -540,3 +547,11 @@ Three checks worth doing by hand:
 No measured quantity enters any of this. Acquisition settings (TR, TE, flip,
 bandwidth, voxel, slab) are inputs; measured signal, SNR, contrast and calibre
 are not. See the hard constraint in `CLAUDE.md`.
+
+---
+
+*Every number in this document was last re-derived from the code on
+19 October 2026, against the six-module layout and the dermis relaxation times
+measured by Richard et al. 1991. `make check-figures` fails if the committed
+figure stops matching the code; this document has no such guard, so re-run
+`figures/trace_fig1b.py` after any change to `tissues.py`.*

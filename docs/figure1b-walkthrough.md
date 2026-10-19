@@ -54,7 +54,7 @@ class Param:
 arterial_blood.t1_ms      1600 .. 1950   nominal 1650   medium
 arterial_blood.t2star_ms    45 .. 75     nominal 65     medium
 arterial_blood.pd_rel      1.1 .. 1.4    nominal 1.25   low
-dermis.t2star_ms             5 .. 20     nominal 12     LOW
+dermis.t2star_ms             4 .. 10     nominal  8     LOW
 ```
 
 **`nominal` is never read by any figure.** It exists for debugging and for the
@@ -88,8 +88,8 @@ Draw 0 came out as:
 | | T1 (ms) | T2\* (ms) | PD | fatsat_s |
 |---|---|---|---|---|
 | blood | 1830.5 | 54.03 | 1.297 | 1.000 |
-| dermis | 1014.1 | 13.21 | 1.000 | 0.901 |
-| fat | 428.8 | 40.07 | 1.598 | 0.212 |
+| dermis | 1014.1 | 7.28 | 1.000 | 0.901 |
+| fat | 428.8 | 27.18 | 1.598 | 0.212 |
 
 **Why "jointly" matters.** One Latin hypercube covers all 20 parameters at once,
 so draw 0 is a single coherent world — that blood sits beside *its own* dermis

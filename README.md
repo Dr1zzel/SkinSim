@@ -99,9 +99,10 @@ print(low_confidence_report())   # every LOW and VERY_LOW parameter, with its so
 print(unchecked_sources())       # sources not yet read at the publisher
 ```
 
-29 of 44 parameters are currently LOW or VERY_LOW. Epidermis is entirely
-unmeasured at 3 T; dermis `fatsat_s` and `mtc_s` rest on physical arguments
-rather than measurements. This is deliberate — the uncertainty analysis is the
+Most parameters are LOW or VERY_LOW. Skin relaxation times come from a 1.5 T
+study (Richard et al. 1991) and are shifted to 3 T rather than measured there;
+dermis `fatsat_s` and `mtc_s` rest on physical arguments rather than
+measurements, and epidermis T2* has no measurement behind it at all. This is deliberate — the uncertainty analysis is the
 point, not a robustness appendix — but it should be read before any number here
 is quoted.
 

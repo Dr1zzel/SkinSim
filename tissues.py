@@ -99,6 +99,7 @@ STANISZ = ("Stanisz et al., Magn Reson Med 2005;54:507-512, doi:10.1002/mrm.2060
            "Table 1, 3 T, 37 C [checked]")
 BOJORQUEZ = ("Bojorquez et al., Magn Reson Imaging 2017;35:69-80, doi:10.1016/j.mri.2016.08.021, "
              "a review pooling 3 T measurements across methods [checked]")
+RICHARD = ("Richard et al., J Invest Dermatol 1991;97(1):120-125, Table I: 1.5 T, 9 healthy subjects, 5 ROI each [checked]")
 QUERLEUX = ("Querleux et al., in Imaging Technologies and Transdermal Delivery in Skin Disorders, "
             "Wiley-VCH 2020, ch. 14 [checked]")
 
@@ -147,17 +148,19 @@ VENOUS_BLOOD = Tissue(
 
 EPIDERMIS = Tissue(
     name="epidermis",
-    t1_ms=Param(800, 1500, 1100, VL,
-                "no peer-reviewed in vivo 3 T epidermis T1 located. Sharma, Nature Precedings 2010, "
-                "doi:10101/npre.2010.4161.1 quotes T1 ~1000 ms without stating a field [checked, but "
-                "a preprint and field not stated]. The layer is ~100 um thick, so partial volume "
-                "dominates its contribution at the voxel sizes modelled here"),
-    t2_ms=Param(10, 40, 25, VL,
-                "no peer-reviewed in vivo 3 T epidermis T2 located. Sharma (above) quotes 20-35 ms "
-                "for epidermis and dermis together"),
-    t2star_ms=Param(5, 10, 8, VL,
-                    "no measurement located; assumed to sit below the epidermis T2 lower bound, as "
-                    "the invariant T2* <= T2 requires"),
+    t1_ms=Param(850, 1300, 1050, L,
+                f"{RICHARD} measures 887 +/- 92 ms in calf and 720 +/- 104 ms in heel at 1.5 T. No "
+                "3 T value located; T1 lengthens with field, so the interval is shifted up from the "
+                "1.5 T measurement rather than taken from it. The layer is ~100 um thick, so partial "
+                "volume dominates its contribution at the voxel sizes modelled here"),
+    t2_ms=Param(15, 40, 25, L,
+                f"{RICHARD} measures 22.3 +/- 7 ms in calf and 35.6 +/- 5 ms in heel at 1.5 T; the "
+                "site difference is significant (p < 0.01) and the lower leg is the target. T2 is "
+                "only weakly field-dependent, so the 1.5 T value transfers. Note epidermal T2 is "
+                "LONGER than dermal, which the same paper attributes to the absence of collagen"),
+    t2star_ms=Param(5, 15, 10, VL,
+                    "no measurement located; bounded above by the epidermis T2 lower bound, as the "
+                    "invariant T2* <= T2 requires"),
     pd_rel=Param(0.6, 1.2, 0.9, VL,
                  "estimate: viable epidermis assumed dermis-like in water content, while the stratum "
                  "corneum is near-invisible at these echo times"),
@@ -171,22 +174,28 @@ EPIDERMIS = Tissue(
 DERMIS = Tissue(
     name="dermis",
     t1_ms=Param(850, 1400, 1100, L,
-                f"{QUERLEUX} reports in vivo dermis T1 of 700-1000 ms at 1.5 T and 1000-1700 ms at "
-                "7 T, citing Richard et al., J Invest Dermatol 1991 and Barral et al., Magn Reson Med "
-                "2010;63:790-796 [both unchecked]. No 3 T value was located, so the interval is the "
-                "field interpolation between those two brackets. Barral measures skin at 3 T and "
-                "should be read directly"),
-    t2_ms=Param(20, 60, 35, L,
-                f"{QUERLEUX} describes dermal T2 as tens of milliseconds. Dermal T2 is multi-"
-                "exponential, with a dominant short component from collagen-bound water, so the "
-                "number depends on how it is fitted and on the echo spacing"),
-    t2star_ms=Param(5, 20, 12, L,
+                f"{RICHARD} measures 870 +/- 143 ms in calf and 728 +/- 104 ms in heel at 1.5 T, "
+                f"consistent with the 700-1000 ms bracket {QUERLEUX} quotes for 1.5 T against "
+                "1000-1700 ms at 7 T. No 3 T measurement was located, so the interval is the field "
+                "interpolation between those brackets. Barral et al., Magn Reson Med 2010;63:790-796 "
+                "images skin at 3 T but reports no relaxation times [checked]; the measurement is in "
+                "its reference 39, Barral et al., Skin T1 mapping at 1.5T, 3T and 7T, Proc ISMRM 2009 "
+                "p. 4451, which would settle this"),
+    t2_ms=Param(10, 23, 14, M,
+                f"{RICHARD} measures 13 +/- 2.4 ms in calf and 17.9 +/- 5 ms in heel at 1.5 T. The "
+                "site difference is significant (p < 0.01) and the lower leg is the target, so the "
+                "interval is weighted to the calf value. T2 is only weakly field-dependent. Dermal T2 "
+                "is short because collagen is ~70 % of dermal dry weight and constrains water proton "
+                "mobility; it is also multi-exponential, so the fitted value depends on echo spacing"),
+    t2star_ms=Param(4, 10, 8, L,
                     "Sharma, Nature Precedings 2010, doi:10101/npre.2010.4161.1 reports a single-"
                     "component dermal T2* of 12 +/- 1.4 ms over echo times 2.8-20 ms, and a "
                     "bi-exponential fit of 9.8 ms carrying ~91 % of the signal with a 42.7 ms "
-                    "remainder [checked, but a preprint]. Sensitivity analyses consistently make this "
-                    "the dominant parameter for blood/dermis contrast, so it warrants a direct "
-                    "measurement"),
+                    "remainder [checked, but a preprint]. That 12 ms sits above the dermis T2 lower "
+                    "bound measured by Richard, which T2* cannot exceed, so the interval is capped "
+                    "there and the bi-exponential fast component is the better guide. Sensitivity "
+                    "analyses consistently make this the dominant parameter for blood/dermis "
+                    "contrast, so it warrants a direct measurement"),
     pd_rel=Param(1.0, 1.0, 1.0, H, "reference tissue: dermis = 1 by definition"),
     fatsat_s=Param(0.7, 1.0, 0.9, VL,
                    "an MT proxy, not spectral suppression: the off-resonance fat pulse partially "
@@ -207,12 +216,13 @@ HYPODERMIS = Tissue(
                 "253-450 ms, including 371 +/- 8 ms (Gold et al., AJR 2004), 382 +/- 13 ms "
                 "(De Bazelaire et al.) and 421 +/- 104 ms (Barral et al.). The interval covers the "
                 "bulk of that spread"),
-    t2_ms=Param(45, 160, 90, L,
-                f"{BOJORQUEZ} tabulates 3 T fat T2 from 41 to 371 ms and states the value is strongly "
+    t2_ms=Param(30, 160, 70, L,
+                f"{RICHARD} measures 35.4 +/- 3.6 ms in calf at 1.5 T by spin echo. {BOJORQUEZ} "
+                "tabulates 3 T fat T2 from 41 to 371 ms and states the value is strongly "
                 "method-dependent: multi-echo spin echo gives ~113-154 ms, single spin echo ~41 ms, "
                 "fast spin echo rising with echo-train length. The spread is dominated by method, not "
                 "by biology"),
-    t2star_ms=Param(10, 45, 25, VL,
+    t2star_ms=Param(10, 30, 20, VL,
                     "no 3 T subcutaneous-fat T2* located. A mono-exponential T2* is in any case "
                     "ill-defined for fat, whose several spectral peaks dephase against each other"),
     pd_rel=Param(1.1, 1.6, 1.4, L,

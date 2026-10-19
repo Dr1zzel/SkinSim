@@ -300,8 +300,24 @@ TARGET_VESSEL_VELOCITY = Param(
     "v ~ d of Murray's law, which is the scaling expected on theoretical grounds. That yields "
     "4.9 mm/s at 100 um, 14.5 at 300 um and 23.8 at 500 um. The interval is wider than that "
     "4.9-23.8 span, which is only the diameter sweep and carries no uncertainty in the exponent, "
-    "in the peak-systolic-to-mean conversion, between arteries and veins, or between subjects. "
-    "Sampled independently of TARGET_DIAMETER although v ~ d couples them", log=True)
+    "in the peak-systolic-to-mean conversion or between subjects. Both anchors are ARTERIAL, so "
+    "this interval applies to the arterial half of the target population only; see "
+    "VENOUS_VESSEL_VELOCITY. Sampled independently of TARGET_DIAMETER although v ~ d couples them",
+    log=True)
+
+VENOUS_VESSEL_VELOCITY = Param(
+    1.4, 7.8, 3.5, M,
+    "time-averaged mean velocity of 100-500 um SUBCUTANEOUS VEINS, supine. The arterial scaling "
+    "above does not transfer: applied to a 3 mm vessel it predicts 134 mm/s, whereas the great "
+    "saphenous vein of legs without varicose veins runs at 18.0 mm/s (IQR 7.6-30.3), measured "
+    "supine by phase-contrast MRI in 53 legs (Tseng et al., Diagnostics 2022;12:118, "
+    "doi:10.3390/diagnostics12010118, Table 3 [checked]) - an over-prediction of 7.4x. A power law "
+    "through the venular capillary limb (12.5 um at 0.47 mm/s) and that 3 mm anchor gives "
+    "v ~ d^0.67, against d^0.93 arterially, which is physically expected: the venous bed holds more "
+    "blood at lower velocity for the same flow. That yields 1.9 mm/s at 100 um, 3.9 at 300 um and "
+    "5.5 at 500 um; the interval spans the measured IQR propagated through the same law. "
+    "Consequence: at these velocities inflow enhancement is 1.0-1.3x, so TOF of cutaneous veins is "
+    "effectively a steady-state spoiled GRE", log=True)
 
 THERMOREGULATORY_FACTOR = Param(
     0.3, 3.0, 1.0, M,
@@ -322,6 +338,7 @@ HAEMODYNAMICS: dict[str, Param] = {
     "capillary_velocity": CAPILLARY_VELOCITY,
     "arteriole_velocity": ARTERIOLE_VELOCITY,
     "target_vessel_velocity": TARGET_VESSEL_VELOCITY,
+    "venous_vessel_velocity": VENOUS_VESSEL_VELOCITY,
     "thermoregulatory_factor": THERMOREGULATORY_FACTOR,
     "target_diameter": TARGET_DIAMETER,
     "vessel_angle_to_slab_normal": VESSEL_ANGLE_TO_SLAB_NORMAL,

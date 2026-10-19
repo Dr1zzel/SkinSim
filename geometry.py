@@ -35,6 +35,60 @@ def tissue_at_depth(depth_mm: float) -> Tissue:
 
 
 @dataclass(frozen=True)
+class VesselLevel:
+    """One horizontal level of the cutaneous vascular tree: where it sits and how wide its vessels are."""
+
+    name: str
+    top_mm: float  # depth below the skin surface
+    bottom_mm: float
+    diameter_um: tuple[float, float]
+    source: str
+
+    def __post_init__(self) -> None:
+        if not 0 <= self.top_mm <= self.bottom_mm:
+            raise ValueError(f"{self.name}: need 0 <= top <= bottom, got {self.top_mm}, {self.bottom_mm}")
+        if not 0 < self.diameter_um[0] <= self.diameter_um[1]:
+            raise ValueError(f"{self.name}: need 0 < min <= max diameter, got {self.diameter_um}")
+
+
+BRAVERMAN = ("Braverman, J Invest Dermatol Symp Proc 2000;5(1):3-9, "
+             "doi:10.1046/j.1087-0024.2000.00010.x [checked]")
+
+# The depth range the project set out to reach, as stated in CLAUDE.md. It is a
+# target, not an anatomical boundary: its upper 1-2 mm lies in dermis, where the
+# measured plexus calibres (PLEXUS) top out near 120 um, so vessels of the full
+# target calibre exist only below the dermal-subcutaneous junction.
+TARGET_DEPTH_MM: tuple[float, float] = (1.0, 10.0)
+
+# The cutaneous vascular tree by depth. Anatomy only: nothing here feeds the
+# signal model, which takes vessel depth and diameter as swept inputs. It
+# exists so a figure of the anatomy cannot drift from the layer boundaries
+# above, and so the target calibre can be placed against measured anatomy.
+PLEXUS: tuple[VesselLevel, ...] = (
+    VesselLevel("capillary loops", 0.1, 0.4, (10.0, 12.0),
+                f"{BRAVERMAN}: arterial capillary outer diameter 10-12 um in the papillary dermis, "
+                "one loop per dermal papilla"),
+    VesselLevel("superficial (subpapillary) plexus", 1.0, 1.5, (17.0, 26.0),
+                f"{BRAVERMAN}: terminal arterioles 17-26 um and postcapillary venules 18-23 um, "
+                "in a horizontal plexus 1-1.5 mm below the surface; ascending arterioles are "
+                "spaced 1.5-7 mm apart"),
+    VesselLevel("lower dermis", 1.5, 2.0, (40.0, 50.0),
+                f"{BRAVERMAN}: arterioles and collecting venules of the lower third of the dermis "
+                "are 40-50 um, with walls 10-16 um thick"),
+    VesselLevel("deep (dermal-subcutaneous) plexus", 2.0, 2.6, (50.0, 120.0),
+                f"{BRAVERMAN}: deep arterioles about 50 um, valved collecting venules at the "
+                "dermal-fat junction 70-120 um, and a rare arteriole of about 100 um within the fat"),
+    VesselLevel("subcutaneous vessels", 2.0, 10.0, (100.0, 500.0),
+                "the project's target calibre, not a measurement of this layer: it spans the gap "
+                "between the ~120 um ceiling of the dermal plexus and the ~1.9 mm lower-limb "
+                "perforators, which no imaging study resolves in human skin in vivo"),
+    VesselLevel("perforators", 8.0, 12.0, (1000.0, 1930.0),
+                "lower-limb cutaneous perforators, mean diameter 1.93 mm, crossing the deep fascia "
+                "(J Reconstr Microsurg 2021;37(1):75-82, doi:10.1055/s-0040-1702162 [checked])"),
+)
+
+
+@dataclass(frozen=True)
 class Vessel:
     """Straight vessel segment: depth decides its background, polar_deg (from the skin normal, 90 = in-plane) and azimuth_deg decide its path."""
 

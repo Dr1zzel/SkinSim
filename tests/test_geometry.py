@@ -1,10 +1,9 @@
 """Skin layers, vessel geometry, laminar shells, slab path and coverage."""
 from __future__ import annotations
 
-# --- from test_skin.py ---
 import pytest
 
-from geometry import laminar_velocities, tissue_at_depth
+from geometry import PLEXUS, VesselLevel, laminar_velocities, tissue_at_depth
 from tissues import DERMIS, EPIDERMIS, HYPODERMIS, MUSCLE
 
 
@@ -97,3 +96,26 @@ def test_dependencies_run_one_way():
     for module, forbidden in layers.items():
         leaked = imported_modules(module) & forbidden
         assert not leaked, f"{module}.py must not import {sorted(leaked)}"
+
+
+@pytest.mark.parametrize("level", PLEXUS, ids=lambda v: v.name)
+def test_every_plexus_level_sits_inside_the_skin_and_cites_a_source(level):
+    assert tissue_at_depth(level.top_mm) is not None
+    assert level.bottom_mm >= level.top_mm
+    assert "doi:" in level.source or "not a measurement" in level.source
+
+
+def test_plexus_is_ordered_by_depth_and_widens_with_it():
+    tops = [v.top_mm for v in PLEXUS]
+    assert tops == sorted(tops)
+    # vessels get wider as the tree descends; compare the dermal levels, which
+    # are the ones measured rather than targeted
+    dermal = [v for v in PLEXUS if v.bottom_mm <= 2.6]
+    assert [v.diameter_um[1] for v in dermal] == sorted(v.diameter_um[1] for v in dermal)
+
+
+def test_vessel_level_rejects_inverted_depths_and_diameters():
+    with pytest.raises(ValueError):
+        VesselLevel("bad", 2.0, 1.0, (10.0, 20.0), "test")
+    with pytest.raises(ValueError):
+        VesselLevel("bad", 1.0, 2.0, (20.0, 10.0), "test")

@@ -139,7 +139,7 @@ def main() -> None:
     v_lo, v_hi = np.percentile(drawn_v, [5, 95])
 
     fig, ax = plt.subplots(figsize=(7.6, 4.9))
-    fig.subplots_adjust(left=0.115, right=0.775, top=0.85, bottom=0.26)
+    fig.subplots_adjust(left=0.115, right=0.775, top=0.90, bottom=0.26)
 
     blood = np.array([[blood_at(plain, s["arterial_blood"], v) for s in samples] for v in VELOCITIES])
     lo, mid, hi = np.percentile(blood, [5, 50, 95], axis=-1)
@@ -175,10 +175,9 @@ def main() -> None:
     ax.xaxis.set_minor_locator(plt.NullLocator())
     ax.set_xlabel("mean blood velocity (mm/s)", color=INK_2, labelpad=40)
     ax.set_ylabel("simulated signal\n(1 = full dermis magnetisation)", color=INK_2)
-    ax.set_title("Fat suppression, not inflow, is what makes a cutaneous vessel visible",
-                 fontsize=10.5, color=INK, loc="left", pad=16)
-    ax.text(0, 1.015, f"spoiled-GRE TOF, TR {TR_MS:g} ms, {FLIP_DEG:g}°, vessel crossing a {SLAB_MM:g} mm slab "
-                      f"end-on; gap to the stagnant line = the inflow gain",
+    # No in-figure headline: the claim belongs in the caption, not on the axes.
+    ax.text(0, 1.02, f"spoiled-GRE TOF, TR {TR_MS:g} ms, {FLIP_DEG:g}°, vessel crossing a {SLAB_MM:g} mm slab "
+                     f"end-on; gap to the stagnant line = the inflow gain",
             transform=ax.transAxes, fontsize=8.5, color=INK_2)
     ax.grid(color=GRID, lw=0.6, zorder=0)
     ax.tick_params(colors=INK_2, labelsize=8)

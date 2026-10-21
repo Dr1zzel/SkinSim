@@ -13,11 +13,11 @@ against drawn as flat references:
 
 Two things follow, and they are different claims:
 
-  - inflow still works: 1.4x at 3 mm/s to 3.4x at 80 mm/s over the stagnant
+  - inflow still works: 1.4x at 3 mm/s to 4.5x at 80 mm/s over the stagnant
     floor, so it is not exhausted at cutaneous velocities;
   - but it is not what makes the vessel visible. Stagnant blood already beats
     dermis and suppressed fat. Inflow is load-bearing only against UNSUPPRESSED
-    fat, where stagnant blood sits at 0.45x the background - and there it
+    fat, where stagnant blood sits at 0.40x the background - and there it
     fails, inverting in every parameter draw.
 
 Layout: the velocity regimes sit on a rail below the axes rather than as shaded
@@ -35,7 +35,7 @@ from common import GRID, INK, INK_2, N_SHELLS, SERIES, plt, save
 
 from geometry import Slab, Vessel
 from sequence import FlowGeometry, SaturationModule, TissueSample, TofSequence
-from protocols import BANDWIDTH_PER_PX_HZ, PARTITION_MM, PRISMA_XR, RF_DURATION_MS, fl3d1r_timing
+from protocols import MEASURED
 from tissues import HAEMODYNAMICS, PARAM_FIELDS, sample_tissues
 
 # Validated two-hue pair (dataviz validator, light surface): blood vs fat.
@@ -43,7 +43,14 @@ BLOOD_C, FAT_C = SERIES[1], SERIES[0]
 DOTTED = (0, (1.2, 1.8))
 
 SEED, N_DRAWS = 20261014, 96
-TR_MS, FLIP_DEG, SLAB_MM, INPLANE_MM = 35.0, 20.0, 12.0, 0.3
+
+# The readout is the 20 October arm WITHOUT fat saturation, because that is the
+# TR the sequence reaches when nothing else is played: adding a fat-sat pulse at
+# the same TR is then the counterfactual this figure needs, rather than a
+# comparison that also changes the timing. Every number comes from the protocol.
+BASE = MEASURED["20oct_nosat"]
+TR_MS, FLIP_DEG = BASE.timing.tr_ms, BASE.flip_deg
+SLAB_MM, INPLANE_MM = BASE.slab_thickness_mm, BASE.inplane_mm
 VELOCITIES = np.geomspace(2.0, 300.0, 64)
 CONVENTIONAL_TOF = (200.0, 600.0)  # intracranial / run-off TOF, for scale
 TICKS = (2, 3, 5, 10, 20, 30, 50, 100, 200, 300)
@@ -60,10 +67,17 @@ def draw() -> tuple[list[dict[str, TissueSample]], np.ndarray]:
 
 
 def sequences() -> tuple[TofSequence, TofSequence]:
-    """Return the TOF readout without and with a per-TR fat-saturation pulse."""
-    timing = fl3d1r_timing(INPLANE_MM, PARTITION_MM, BANDWIDTH_PER_PX_HZ, RF_DURATION_MS, TR_MS, PRISMA_XR)
-    return (TofSequence(timing=timing, flip_deg=FLIP_DEG),
-            TofSequence(timing=timing, flip_deg=FLIP_DEG, modules=(SaturationModule("fatsat_s", 8.0),)))
+    """Return the TOF readout without and with a per-TR fat-saturation pulse, at one shared TR.
+
+    TONE and the travelling saturation band are deliberately left OFF, although
+    the acquired protocol runs both. This figure isolates what inflow alone buys
+    against each background; a ramp that varies the flip with depth and a band
+    that pre-saturates the inflow would both fold into the same curve and could
+    not be read apart from it. Figure 4 is where those arms are compared.
+    """
+    return (TofSequence(timing=BASE.timing, flip_deg=FLIP_DEG),
+            TofSequence(timing=BASE.timing, flip_deg=FLIP_DEG,
+                        modules=(SaturationModule("fatsat_s", BASE.fat_sat_delay_ms),)))
 
 
 def blood_at(seq: TofSequence, sample: TissueSample, velocity: float) -> float:
@@ -176,9 +190,10 @@ def main() -> None:
     ax.set_xlabel("mean blood velocity (mm/s)", color=INK_2, labelpad=40)
     ax.set_ylabel("simulated signal\n(1 = full dermis magnetisation)", color=INK_2)
     # No in-figure headline: the claim belongs in the caption, not on the axes.
-    ax.text(0, 1.02, f"spoiled-GRE TOF, TR {TR_MS:g} ms, {FLIP_DEG:g}°, vessel crossing a {SLAB_MM:g} mm slab "
-                     f"end-on; gap to the stagnant line = the inflow gain",
-            transform=ax.transAxes, fontsize=8.5, color=INK_2)
+    ax.text(0, 1.035, f"spoiled-GRE TOF at the 20 October operating point: TR {TR_MS:g} ms, {FLIP_DEG:g}°, "
+                     f"{SLAB_MM:g} mm slab, TONE off\nvessel crossing end-on; the gap to the stagnant "
+                     f"line is the inflow gain",
+            transform=ax.transAxes, fontsize=8.5, color=INK_2, va="bottom", linespacing=1.45)
     ax.grid(color=GRID, lw=0.6, zorder=0)
     ax.tick_params(colors=INK_2, labelsize=8)
     for side in ("top", "right"):

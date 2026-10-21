@@ -5,7 +5,12 @@ import pytest
 from protocols import (
     ALL_PROTOCOLS,
     CANDIDATES,
+    CONSOLE_TE_MS,
+    CONSOLE_TR_MS,
+    OCT20_TE_MS,
     MEASURED,
+    MEASURED_13OCT,
+    MEASURED_20OCT,
     PRISMA_XR,
     RF_DURATION_MS,
     GradientSystem,
@@ -18,13 +23,25 @@ from protocols import (
 
 
 @pytest.mark.parametrize("protocol", MEASURED.values(), ids=lambda p: p.name)
-def test_readout_timing_reproduces_console_tr_and_te(protocol):
+def test_readout_timing_is_internally_consistent(protocol):
+    """TR is the sum of its named components and the readout is the reciprocal bandwidth."""
     t = protocol.timing
-    assert t.tr_ms == pytest.approx(45.22, abs=0.2)
-    assert t.te_ms == pytest.approx(5.13, abs=0.2)
-    assert t.readout_ms == pytest.approx(1000.0 / 186.0)
+    assert t.readout_ms == pytest.approx(1000.0 / t.bandwidth_per_px_hz)
+    assert t.dead_time_ms >= 0
     assert t.tr_ms == pytest.approx(t.rf_duration_ms + t.rephaser_ms + t.prephaser_ms + t.readout_ms
                                     + t.spoiler_ms + t.dead_time_ms)
+
+
+@pytest.mark.parametrize("session, console_te_ms, console_tr_ms", [
+    (MEASURED_13OCT, CONSOLE_TE_MS, CONSOLE_TR_MS),
+    (MEASURED_20OCT, OCT20_TE_MS, None),  # 20 October: TE shared, TR differs per arm
+])
+def test_each_session_reproduces_its_own_console_te(session, console_te_ms, console_tr_ms):
+    """TE comes back by construction for every arm, and TR too where the session shares one."""
+    for protocol in session.values():
+        assert protocol.timing.te_ms == pytest.approx(console_te_ms, abs=0.2)
+        if console_tr_ms is not None:
+            assert protocol.timing.tr_ms == pytest.approx(console_tr_ms, abs=0.2)
 
 
 def test_inferred_rf_duration_is_positive_and_below_a_few_ms():
@@ -69,4 +86,6 @@ def test_finer_inplane_needs_a_longer_prephaser_so_te_grows():
 def test_measured_and_candidate_protocols_share_one_type():
     assert all(isinstance(p, Protocol) for p in ALL_PROTOCOLS.values())
     assert all(p.acquired is None and p.console_ta_s is None for p in CANDIDATES.values())
-    assert len(MEASURED) == 5
+    assert all(p.acquired is not None for p in MEASURED.values())
+    assert len(MEASURED_13OCT) == 5 and len(MEASURED_20OCT) == 4
+    assert MEASURED == {**MEASURED_13OCT, **MEASURED_20OCT}

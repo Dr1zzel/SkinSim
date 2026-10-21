@@ -187,7 +187,7 @@ _OPERATING_POINT = Protocol(
     fat_sat_delay_ms=8.0, mtc_delay_ms=8.0,
 )
 
-MEASURED: dict[str, Protocol] = {
+MEASURED_13OCT: dict[str, Protocol] = {
     p.name: p for p in (
         replace(_OPERATING_POINT, name="13oct_0.26mm", inplane_mm=0.2578, console_ta_s=349.9),
         replace(_OPERATING_POINT, name="13oct_0.35mm", inplane_mm=0.3477, console_ta_s=246.8),
@@ -199,6 +199,64 @@ MEASURED: dict[str, Protocol] = {
                 console_ta_s=246.8, slab_orientation_deg=0.0),
     )
 }
+
+# --- 20 October 2026: four arms at 0.22 mm, near-isotropic -----------------------
+# Decoded from each series' own embedded MrPhoenixProtocol. A key-by-key diff of
+# the four protocols found 19 meaningful differences and no others, so what
+# separates the arms is exactly: TR, the saturation modules, and - on the
+# reversed arm only - the band geometry.
+
+# KNOWN SHORTFALL: the derived scan time comes out 0.84x the console's for all
+# four arms. The protocol declares sKSpace.lPhaseEncodingLines = 293 while
+# lines_per_partition derives 244 from the phase FOV and voxel, and 293/244 =
+# 1.20 is exactly the missing factor. The acquired line count is evidently not
+# the reconstructed matrix. Scan time feeds detect.cnr_efficiency, so this is
+# worth fixing with an explicit acquired-lines field rather than a fudge.
+OCT20_TE_MS, OCT20_BANDWIDTH_HZ = 5.86, 187.0
+OCT20_INPLANE_MM, OCT20_PARTITION_MM = 0.217593, 0.22
+OCT20_RF_DURATION_MS = infer_rf_duration_ms(OCT20_TE_MS, OCT20_INPLANE_MM, OCT20_PARTITION_MM,
+                                            OCT20_BANDWIDTH_HZ, PRISMA_XR)
+
+
+def oct20_timing(tr_ms: float) -> ReadoutTiming:
+    """Return the 20 October readout timing at one arm's TR; every other component is shared."""
+    return fl3d1r_timing(OCT20_INPLANE_MM, OCT20_PARTITION_MM, OCT20_BANDWIDTH_HZ,
+                         OCT20_RF_DURATION_MS, tr_ms, PRISMA_XR)
+
+
+_OCT20 = Protocol(
+    name="", acquired="2026-10-20", timing=oct20_timing(50.60), flip_deg=25.0, tone_pct=70.0,
+    tone_direction=+1,  # ASSUMED, as on 13 October: the declared flow direction is not decoded
+    fat_sat=True, mtc=False,
+    sat_band=SatBand(thickness_mm=40.0, gap_mm=10.0, side=+1),
+    # The slab normal is 83.2 deg from the head-foot axis, so the slab lies ALONG
+    # the limb and is roughly tangent to the skin: orientation 0, not the 90 deg
+    # of 13 October, despite "tra" in every series name. Verified two ways - the
+    # protocol's own sNormal and the DICOM ImageOrientationPatient agree to 1.0000.
+    slab_orientation_deg=0.0,
+    n_partitions=52, partition_mm=OCT20_PARTITION_MM, slice_oversampling=0.153846153846,
+    inplane_mm=OCT20_INPLANE_MM, read_fov_mm=94.0, phase_fov_mm=53.0925925926,
+    grappa_r=2, grappa_ref_lines=32, partial_fourier_slice=7 / 8, partial_fourier_phase=1.0,
+    n_channels=4, console_ta_s=442.0, fat_sat_delay_ms=8.0, mtc_delay_ms=8.0,
+)
+
+MEASURED_20OCT: dict[str, Protocol] = {
+    p.name: p for p in (
+        replace(_OCT20, name="20oct_fatsat"),
+        replace(_OCT20, name="20oct_nosat", timing=oct20_timing(35.06), fat_sat=False,
+                console_ta_s=307.0),
+        # ucTOFFlowInNormalDir is set on this arm alone, which reverses the declared
+        # flow direction, so the TONE ramp and the band side both flip. ASSUMED that
+        # the one flag drives both. The band itself also changed, which makes this a
+        # weaker, closer band on the other side rather than the same band mirrored.
+        replace(_OCT20, name="20oct_band_reversed", tone_direction=-1,
+                sat_band=SatBand(thickness_mm=10.0, gap_mm=2.0, side=-1)),
+        replace(_OCT20, name="20oct_fatsat_mtc", timing=oct20_timing(63.87), mtc=True,
+                console_ta_s=556.0),
+    )
+}
+
+MEASURED: dict[str, Protocol] = {**MEASURED_13OCT, **MEASURED_20OCT}
 
 # --- Candidates not yet run ----------------------------------------------------------
 

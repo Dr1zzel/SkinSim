@@ -224,3 +224,30 @@ CANDIDATES: dict[str, Protocol] = {
 }
 
 ALL_PROTOCOLS: dict[str, Protocol] = {**MEASURED, **CANDIDATES}
+
+# --- Named comparisons the figures draw ----------------------------------------------
+# Kept here rather than in the figure scripts so a protocol change cannot leave a
+# figure quoting a resolution the toolbox no longer models.
+
+# The resolution ladder: the three in-plane voxels acquired on 13 October and the
+# finer candidate. Keys index ALL_PROTOCOLS; values label the axis.
+RESOLUTION_SWEEP: dict[str, str] = {
+    "inplane_0.18mm": "0.18 mm (candidate)",
+    "13oct_0.26mm": "0.26 mm",
+    "13oct_0.35mm": "0.35 mm",
+    "13oct_0.46mm": "0.46 mm",
+}
+
+# The sensitivity unit for relative comparisons: absolute SNR needs the coil's
+# sensitivity at depth, which is not derivable here, so figures express every
+# protocol in units of what this one delivers (detect.thermal_snr).
+REFERENCE_PROTOCOL: Protocol = MEASURED["13oct_0.26mm"]
+
+# The contrast mechanisms to compare at fixed geometry: what each arm changes
+# about the background it has to beat.
+CONTRAST_ARMS: dict[str, str] = {
+    "13oct_0.35mm": "fat saturation (operating point)",
+    "fatsat_off": "no fat saturation",
+    "tone_off": "fat saturation, TONE off",
+    "13oct_0.35mm_band_opposite": "fat saturation, band upstream",
+}

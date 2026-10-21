@@ -63,7 +63,7 @@ class Tissue:
     t2_ms: Param
     t2star_ms: Param  # capped at the T2 lower bound so no draw has T2* > T2
     pd_rel: Param
-    fatsat_s: Param  # fraction of Mz one fat-saturation pulse leaves (sequences/prep.py)
+    fatsat_s: Param  # fraction of Mz one fat-saturation pulse leaves (sequence.SaturationModule)
     mtc_s: Param  # fraction of Mz one MTC pulse leaves: an effective, crude MT factor
 
 
@@ -344,9 +344,26 @@ HAEMODYNAMICS: dict[str, Param] = {
     "vessel_angle_to_slab_normal": VESSEL_ANGLE_TO_SLAB_NORMAL,
 }
 
-# Uncertain quantities set by the hardware rather than the tissue, ranged and
-# sampled like everything else.
+# Uncertain quantities set by the hardware and the imaging situation rather
+# than by tissue composition, ranged and sampled like everything else.
 ACQUISITION: dict[str, Param] = {
+    "background_structure_rel": Param(
+        0.02, 0.20, 0.08, VL,
+        "spatial structure of the background as a fraction OF THAT BACKGROUND'S OWN MEAN SIGNAL: "
+        "fibrous septa, the dermis/fat boundary, hair follicles, and partial volume between them. "
+        "Relative to its own mean is the only definition that stays physical, because the absolute "
+        "texture a sequence has to beat is this fraction times the background the sequence produces: "
+        "suppress the fat and its texture goes with it. Quoted instead against a fixed reference "
+        "signal, 6 % would exceed the whole suppressed-fat background by 2.5x, which is impossible. "
+        "The absolute figure detect.py needs is therefore derived, in predict.Prediction, never stored. "
+        "Texture does NOT average down as sensitivity improves, so it sets the ceiling on "
+        "contrast-to-texture: peak-voxel CNR tends to f |contrast| / (rel x background) as SNR grows "
+        "rather than growing without bound, which is what decides whether the regime is "
+        "sensitivity-limited or texture-limited and whether a finer voxel can ever pay. No measurement "
+        "for skin at these voxel sizes was located and none is derivable here, so this is a SWEPT AXIS, "
+        "not an estimate: the interval runs from an essentially smooth background (2 %) to one whose "
+        "septa and boundaries modulate it by a fifth (20 %). Estimating it from a background region of "
+        "an image belongs in measured.py, never here"),
     "sat_band_pulse_residual": Param(
         -0.31, 0.31, 0.0, L,
         "fraction of Mz one travelling-saturation-band pulse leaves: cos(90 deg x b) for a B1 scale "

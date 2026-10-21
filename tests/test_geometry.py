@@ -88,11 +88,13 @@ def imported_modules(name: str) -> set[str]:
 
 def test_dependencies_run_one_way():
     """The layering holds: data knows nothing of geometry, geometry nothing of sequences."""
-    layers = {"tissues": {"geometry", "sequence", "detect", "protocols"},
-              "geometry": {"sequence", "detect", "protocols"},
-              "affine": {"tissues", "geometry", "sequence", "detect", "protocols"},
-              "sequence": {"detect", "protocols"},
-              "detect": {"sequence", "protocols", "geometry"}}
+    # predict.py sits at the top and composes the rest, so nothing below may know it.
+    layers = {"tissues": {"geometry", "sequence", "detect", "protocols", "predict"},
+              "geometry": {"sequence", "detect", "protocols", "predict"},
+              "affine": {"tissues", "geometry", "sequence", "detect", "protocols", "predict"},
+              "sequence": {"detect", "protocols", "predict"},
+              "detect": {"sequence", "protocols", "geometry", "predict"},
+              "protocols": {"predict"}}
     for module, forbidden in layers.items():
         leaked = imported_modules(module) & forbidden
         assert not leaked, f"{module}.py must not import {sorted(leaked)}"

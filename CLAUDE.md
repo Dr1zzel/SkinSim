@@ -32,7 +32,10 @@ With fat saturation on, the background at 1–10 mm depth is suppressed fat, clo
 
 - **The metric is absolute CNR per √(scan time):** (S_blood − S_background) / σ, with σ set by voxel volume, scan time and g-factor. The ratio is never optimised.
 - **Noise is non-central chi with 2N degrees of freedom** for a sum-of-squares combination of N channels, not Rician (`detect.py`).
-- **Detection uses the Rose criterion (CNR ≥ 4)** on the peak voxel, with partial volume, grid registration (`kappa`, derived by simulating sub-voxel offsets) and background texture that does not average down (`structure_fraction`).
+- **Detection uses the Rose criterion (CNR ≥ 4)** on the peak voxel, with partial volume, grid registration (`kappa`, derived by simulating sub-voxel offsets) and background texture that does not average down.
+- **The signal model and the detection model are joined in `predict.py`, nowhere else.** `detect.py` imports nothing from the project and must stay that way; `predict.py` is the only module allowed to know both halves, and a test enforces it. Any quantity that needs both — CNR efficiency, required SNR, a detection verdict — is computed there rather than re-derived in a figure script.
+- **Background texture is relative to the background, not to a fixed reference.** `tissues.ACQUISITION["background_structure_rel"]` is the background's structure as a fraction of its own mean; the absolute texture `detect.py` needs is derived in `predict.Prediction.structure_fraction` as that fraction times the simulated background. Stored absolutely it would be unphysical — 6 % of a unit reference signal is 2.5× the whole suppressed-fat background. The consequence is that fat saturation suppresses the texture floor by the same factor as the background, which is why it decides detectability rather than merely brightness.
+- **Reference SNR is the bridge and is never stored.** Simulated signals are relative (dermis M0 = 1) and `detect` works in units of σ, so the two meet at the SNR a voxel would have if its simulated signal were exactly 1. Absolute sensitivity needs the coil's sensitivity at depth, which is not derivable here, so it stays an argument (`Prediction.cnr`) and figures either sweep it or quote ratios between protocols.
 
 ## Backgrounds
 

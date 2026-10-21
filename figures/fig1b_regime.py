@@ -181,8 +181,6 @@ def main() -> None:
     frac = float(np.mean([blood_at(plain, s["arterial_blood"], float(v)) < float(plain.static_signal(s["hypodermis"]))
                           for s, v in zip(samples, drawn_v)]))
     ax.plot([x50], [fat_u], "o", ms=8, mfc="white", mec=BLOOD_C, mew=2.1, zorder=7)
-    ax.annotate(f"darker than fat\n{frac:.0%} of draws", (VELOCITIES[0] * 1.95, fat_u * 0.78),
-                ha="center", va="center", fontsize=8.5, color=BLOOD_C, weight="bold", zorder=8)
 
     ax.set(xscale="log", xlim=(VELOCITIES[0], VELOCITIES[-1]), ylim=(0, 0.45), xticks=TICKS)
     ax.set_xticklabels([str(t) for t in TICKS])
@@ -190,10 +188,9 @@ def main() -> None:
     ax.set_xlabel("mean blood velocity (mm/s)", color=INK_2, labelpad=40)
     ax.set_ylabel("simulated signal\n(1 = full dermis magnetisation)", color=INK_2)
     # No in-figure headline: the claim belongs in the caption, not on the axes.
-    ax.text(0, 1.035, f"spoiled-GRE TOF at the 20 October operating point: TR {TR_MS:g} ms, {FLIP_DEG:g}°, "
-                     f"{SLAB_MM:g} mm slab, TONE off\nvessel crossing end-on; the gap to the stagnant "
-                     f"line is the inflow gain",
-            transform=ax.transAxes, fontsize=8.5, color=INK_2, va="bottom", linespacing=1.45)
+    ax.text(0, 1.02, f"spoiled-GRE TOF, TR {TR_MS:g} ms, {FLIP_DEG:g}°, {SLAB_MM:g} mm slab; "
+                     f"gap to the stagnant line = inflow gain",
+            transform=ax.transAxes, fontsize=8.0, color=INK_2)
     ax.grid(color=GRID, lw=0.6, zorder=0)
     ax.tick_params(colors=INK_2, labelsize=8)
     for side in ("top", "right"):

@@ -26,9 +26,9 @@ from tissues import HAEMODYNAMICS, PARAM_FIELDS, TissueSample, sample_tissues  #
 SEED, N_DRAWS = 20261014, 128
 TISSUE_KEYS = ["arterial_blood", "dermis", "hypodermis", "muscle"]
 HAEMO_KEYS = ("target_vessel_velocity", "thermoregulatory_factor")
-ACQ_KEYS = ("sat_band_pulse_residual", "grappa_r2_g_factor")
+ACQ_KEYS = ("sat_band_pulse_residual", "grappa_r2_g_factor", "background_structure_rel")
 N_SHELLS = 8  # numerical resolution of the laminar profile, not a physical parameter
-MAX_PATH_MM = 30.0  # unjustified cap (acquisition.path_length); inactive for vessels crossing the slab
+MAX_PATH_MM = 30.0  # unjustified cap (geometry.path_length); inactive for vessels crossing the slab
 DERMIS_DEPTH_MM, HYPODERMIS_DEPTH_MM = 1.0, 5.0  # one vessel depth inside each background layer
 
 # Reference categorical palette (dataviz skill, light mode), slots 1-6, and neutral ink.
@@ -60,19 +60,32 @@ def tilted(slab: Slab, angle_to_normal_deg: float, velocity_mm_s) -> FlowGeometr
     return FlowGeometry(vessel, slab, velocity_mm_s, N_SHELLS, MAX_PATH_MM, entry_z_frac=0.5)
 
 
+def percentiles(values: np.ndarray) -> np.ndarray:
+    """Return the 5th, 50th and 95th percentiles over draws (last axis), ignoring draws with no finite answer.
+
+    A draw whose required sensitivity is infinite - texture beats the contrast at
+    any SNR - carries no number to average. Dropping those keeps the band over
+    the draws that are possible; where most of them are impossible the median
+    itself goes undefined and the curve breaks, which is the honest rendering.
+    """
+    finite = np.where(np.isfinite(values), values, np.nan)
+    with np.errstate(invalid="ignore"):
+        return np.nanpercentile(finite, [5, 50, 95], axis=-1)
+
+
 def band(ax: plt.Axes, x: np.ndarray, values: np.ndarray, colour: str, label: str, **line) -> None:
     """Plot the median over draws (last axis) as a line and the 5-95 % range as a band."""
-    with np.errstate(invalid="ignore"):  # draws whose requirement is infinite (texture wins) are allowed
-        lo, mid, hi = np.percentile(values, [5, 50, 95], axis=-1)
+    lo, mid, hi = percentiles(values)
     ax.fill_between(x, lo, hi, color=colour, alpha=0.18, linewidth=0)
     ax.plot(x, mid, color=colour, lw=2, label=label, **line)
 
 
 def summary(values: np.ndarray) -> str:
-    """Return 'median [5-95 %]' of draws along the last axis."""
-    with np.errstate(invalid="ignore"):
-        lo, mid, hi = np.percentile(values, [5, 50, 95], axis=-1)
-    return f"{mid:.3g} [{lo:.3g}-{hi:.3g}]"
+    """Return 'median [5-95 %]' of draws along the last axis, with the share that have no finite answer."""
+    lo, mid, hi = percentiles(values)
+    impossible = float(np.mean(~np.isfinite(values)))
+    tail = f", {impossible:.0%} impossible" if impossible else ""
+    return f"{mid:.3g} [{lo:.3g}-{hi:.3g}]{tail}"
 
 
 def style(ax: plt.Axes) -> None:

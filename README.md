@@ -30,7 +30,7 @@ Requires Python 3.11+, NumPy, SciPy and Matplotlib.
 
 ```bash
 pip install numpy scipy matplotlib pytest
-make test          # 125 tests
+make test          # the whole suite
 make figures       # regenerate every figure into figures/
 make check         # tests, then verify the committed figures match the code
 ```
@@ -52,10 +52,16 @@ and read [docs/figure1b-walkthrough.md](docs/figure1b-walkthrough.md) beside it.
 | `tissues.py` | every parameter as an interval with a confidence rating and a source, plus the Latin-hypercube sampler |
 | `sequence.py` | readout timing, saturation pulses, TONE, and the TOF signal model |
 | `geometry.py` | skin layers, vessel geometry, laminar shells, the slab and the path through it |
-| `protocols.py` | TR and TE assembled from named timing components |
+| `protocols.py` | TR and TE assembled from named timing components, and the named comparisons the figures draw |
 | `detect.py` | channel noise statistics, CNR per √(scan time), partial volume, apparent width, SNR required to detect |
+| `predict.py` | the composition layer: protocol + vessel + tissues → contrast, CNR efficiency and a detection verdict |
 
-Tests mirror the modules, 109 of them, run by `make test`. `tests/reference.py` holds independent closed-form implementations used to check the fast path; nothing in the toolbox imports it, which is what makes the comparison a real check.
+The stack runs one way. `affine` knows no MR; `tissues`, `geometry`, `sequence`
+and `protocols` build the signal model; `detect` is pure statistics and
+geometry and imports nothing from the project. Only `predict` joins the last
+two, and a test asserts that nothing below it imports it.
+
+Tests mirror the modules and are run by `make test`. `tests/reference.py` holds independent closed-form implementations used to check the fast path; nothing in the toolbox imports it, which is what makes the comparison a real check.
 
 ## Figures
 
@@ -63,9 +69,13 @@ Scripts that produce figures for the abstract:
 
 | script | figure |
 |---|---|
+| `figures/fig1a_anatomy.py` | **Figure 1a** — the cutaneous vascular tree to scale, against the target calibre |
 | `figures/fig1b_regime.py` | **Figure 1b** — inflow against the backgrounds it competes with |
-| `figures/fig5_detectability.py` | **Figure 5** (simulation panel) — detection threshold and apparent width |
+| `figures/fig4_efficiency.py` | **Figure 4** — CNR efficiency over velocity × orientation, by contrast mechanism and flip |
+| `figures/fig5_detectability.py` | **Figure 5** (simulation panel) — what finer voxels cost, and what width they can report |
 
+`figures/trace_fig1b.py` is not a figure: it re-derives Figure 1b stage by stage
+and prints every intermediate, as the companion to the walkthrough.
 
 Every figure records its Latin-hypercube seed and draw count in its own footer,
 so any panel can be regenerated exactly.

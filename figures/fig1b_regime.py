@@ -212,7 +212,7 @@ def main() -> None:
         print(f"  paired, stagnant blood - {name}: {np.median(d):+.3f} "
               f"[{np.percentile(d, 5):+.3f}, {np.percentile(d, 95):+.3f}], brighter in {np.mean(d > 0):.0%} of draws")
 
-    save(fig, "fig1b_regime", n=N_DRAWS, seed=SEED,
+    save(fig, "fig1b_regime", n=N_DRAWS, seed=SEED, footer=False,
          note=f"Simulation only; literature tissue parameters, no measured data. "
               f"LHS seed {SEED}, {N_DRAWS} draws; lines median, bands 5-95 %.")
 

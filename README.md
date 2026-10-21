@@ -77,8 +77,10 @@ Scripts that produce figures for the abstract:
 `figures/trace_fig1b.py` is not a figure: it re-derives Figure 1b stage by stage
 and prints every intermediate, as the companion to the walkthrough.
 
-Every figure records its Latin-hypercube seed and draw count in its own footer,
-so any panel can be regenerated exactly.
+Every figure records its Latin-hypercube seed and draw count — in a footer on
+the image, or, where the caption will carry it instead, in the PNG's own
+`Description` metadata. Either way the seed travels with the file, so any panel
+can be regenerated exactly.
 
 ## The constraint that matters
 
